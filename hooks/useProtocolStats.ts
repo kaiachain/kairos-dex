@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { query } from '@/lib/graphql';
-import { GET_PROTOCOL_STATS_QUERY } from '@/lib/graphql-queries';
-import { SubgraphProtocolStatsResponse } from '@/types/subgraph';
-import { CONTRACTS } from '@/config/contracts';
+import { GET_PROTOCOL_STATS_FROM_POOLS_QUERY } from '@/lib/graphql-queries';
+import { SubgraphProtocolStatsFromPoolsResponse } from '@/types/subgraph';
 
 interface ProtocolStats {
   totalTVL: number;
@@ -38,20 +37,50 @@ export function useProtocolStats() {
         setIsLoading(true);
         
         try {
-          if (!CONTRACTS.V3CoreFactory) {
-            throw new Error('Factory address not configured');
-          }
-          const response = await query<SubgraphProtocolStatsResponse>(GET_PROTOCOL_STATS_QUERY, {
-            factoryId: CONTRACTS.V3CoreFactory.toLowerCase() as `0x${string}`,
+          // Since factory and uniswapDayData are not exposed as root queries in this subgraph,
+          // we'll use pools aggregation as the primary method
+          const response = await query<SubgraphProtocolStatsFromPoolsResponse>(GET_PROTOCOL_STATS_FROM_POOLS_QUERY, {
+            first: 1000, // Get up to 1000 pools for aggregation
           });
           
-          const factory = response.factory;
-          const dayData = response.uniswapDayData;
+          // Aggregate data from pools
+          const pools = response.pools;
+          
+          // Calculate total TVL from all pools
+          const totalTVL = pools.reduce((sum, pool) => 
+            sum + parseFloat(pool.totalValueLockedUSD || '0'), 0
+          );
+          
+          // Aggregate pool day data by date
+          const dayDataMap = new Map<number, { volumeUSD: number; feesUSD: number; tvlUSD: number }>();
+          
+          pools.forEach(pool => {
+            pool.poolDayData.forEach(day => {
+              const date = day.date;
+              const existing = dayDataMap.get(date) || { volumeUSD: 0, feesUSD: 0, tvlUSD: 0 };
+              dayDataMap.set(date, {
+                volumeUSD: existing.volumeUSD + parseFloat(day.volumeUSD || '0'),
+                feesUSD: existing.feesUSD + parseFloat(day.feesUSD || '0'),
+                tvlUSD: existing.tvlUSD + parseFloat(day.tvlUSD || '0'),
+              });
+            });
+          });
+          
+          // Convert map to sorted array (most recent first)
+          const dayData = Array.from(dayDataMap.entries())
+            .map(([date, data]) => ({
+              date,
+              volumeUSD: data.volumeUSD.toString(),
+              feesUSD: data.feesUSD.toString(),
+              tvlUSD: data.tvlUSD.toString(),
+              txCount: '0', // Not available from pool aggregation
+            }))
+            .sort((a, b) => b.date - a.date)
+            .slice(0, 30);
           
           const today = dayData[0];
           const yesterday = dayData[1];
           
-          const totalTVL = factory ? parseFloat(factory.totalValueLockedUSD || '0') : 0;
           const yesterdayTVL = yesterday ? parseFloat(yesterday.tvlUSD || '0') : 0;
           const tvlChange24h = yesterdayTVL > 0 ? ((totalTVL - yesterdayTVL) / yesterdayTVL) * 100 : 0;
           
@@ -59,7 +88,6 @@ export function useProtocolStats() {
           const yesterdayVolume = yesterday ? parseFloat(yesterday.volumeUSD || '0') : 0;
           const volumeChange24h = yesterdayVolume > 0 ? ((volume24h - yesterdayVolume) / yesterdayVolume) * 100 : 0;
           
-          // Calculate 7d and 30d volume from day data
           const volume7d = dayData
             .slice(0, 7)
             .reduce((sum, day) => sum + parseFloat(day.volumeUSD || '0'), 0);
@@ -68,8 +96,9 @@ export function useProtocolStats() {
             .slice(0, 30)
             .reduce((sum, day) => sum + parseFloat(day.volumeUSD || '0'), 0);
           
-          const totalPools = factory ? parseInt(factory.poolCount || '0', 10) : 0;
-          const totalFees = factory ? parseFloat(factory.totalFeesUSD || '0') : 0;
+          const totalFees = pools.reduce((sum, pool) => 
+            sum + parseFloat(pool.feesUSD || '0'), 0
+          );
           
           setStats({
             totalTVL,
@@ -78,9 +107,9 @@ export function useProtocolStats() {
             volumeChange24h,
             volume7d,
             volume30d,
-            totalPools,
-            totalPositions: 0, // Would need separate query for positions count
-            activeUsers: 0, // Would need separate query for active users
+            totalPools: pools.length,
+            totalPositions: 0,
+            activeUsers: 0,
             totalFees,
           });
         } catch (subgraphError) {

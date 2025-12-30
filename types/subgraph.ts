@@ -192,3 +192,13 @@ export interface SubgraphProtocolStatsResponse {
   uniswapDayData: SubgraphUniswapDayData[];
   factory: SubgraphFactory | null;
 }
+
+export interface SubgraphProtocolStatsFromPoolsResponse {
+  pools: Array<{
+    id: string;
+    totalValueLockedUSD: string;
+    volumeUSD: string;
+    feesUSD: string;
+    poolDayData: SubgraphPoolDayData[];
+  }>;
+}

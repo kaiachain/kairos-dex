@@ -339,10 +339,10 @@ export const GET_POSITION_BY_TICKS_QUERY = `
 export const GET_POSITIONS_QUERY = GET_POSITION_EVENTS_QUERY;
 export const GET_POSITION_BY_ID_QUERY = GET_POSITION_BY_TICKS_QUERY;
 
-// Query: Get protocol statistics
+// Query: Get protocol statistics with factory
 // Note: Factory ID should be the factory contract address (Bytes format)
-export const GET_PROTOCOL_STATS_QUERY = `
-  query GetProtocolStats($factoryId: Bytes!) {
+export const GET_PROTOCOL_STATS_WITH_FACTORY_QUERY = `
+  query GetProtocolStatsWithFactory($factoryId: Bytes!) {
     uniswapDayData(orderBy: date, orderDirection: desc, first: 30) {
       date
       volumeUSD
@@ -356,6 +356,42 @@ export const GET_PROTOCOL_STATS_QUERY = `
       totalVolumeUSD
       totalValueLockedUSD
       totalFeesUSD
+    }
+  }
+`;
+
+// Query: Get protocol statistics without factory (day data only)
+export const GET_PROTOCOL_STATS_DAY_DATA_QUERY = `
+  query GetProtocolStatsDayData {
+    uniswapDayData(orderBy: date, orderDirection: desc, first: 30) {
+      date
+      volumeUSD
+      tvlUSD
+      feesUSD
+      txCount
+    }
+  }
+`;
+
+// Alternative query that aggregates data from pools (for subgraphs that don't support uniswapDayData or factory)
+export const GET_PROTOCOL_STATS_FROM_POOLS_QUERY = `
+  query GetProtocolStatsFromPools($first: Int!) {
+    pools(
+      first: $first
+      orderBy: totalValueLockedUSD
+      orderDirection: desc
+      where: { totalValueLockedUSD_gt: "0" }
+    ) {
+      id
+      totalValueLockedUSD
+      volumeUSD
+      feesUSD
+      poolDayData(orderBy: date, orderDirection: desc, first: 30) {
+        date
+        volumeUSD
+        feesUSD
+        tvlUSD
+      }
     }
   }
 `;
