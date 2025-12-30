@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeftRight, Droplets, Layers, BarChart3, Settings } from 'lucide-react';
+import { ArrowLeftRight, Droplets, Layers, BarChart3, Settings, Repeat } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/', label: 'Swap', icon: ArrowLeftRight },
+  { href: '/wrap', label: 'Wrap', icon: Repeat },
   { href: '/pools', label: 'Pools', icon: Droplets },
   { href: '/positions', label: 'Positions', icon: Layers },
   { href: '/explore', label: 'Explore', icon: BarChart3 },
