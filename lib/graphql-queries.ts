@@ -343,7 +343,7 @@ export const GET_POSITION_BY_ID_QUERY = GET_POSITION_BY_TICKS_QUERY;
 // Note: Factory ID should be the factory contract address (Bytes format)
 export const GET_PROTOCOL_STATS_QUERY = `
   query GetProtocolStats($factoryId: Bytes!) {
-    uniswapDayData(orderBy: date, orderDirection: desc, first: 2) {
+    uniswapDayData(orderBy: date, orderDirection: desc, first: 30) {
       date
       volumeUSD
       tvlUSD
