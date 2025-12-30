@@ -8,6 +8,10 @@ import { erc20Abi, decodeEventLog } from 'viem';
 import { Token } from '@/types/token';
 import { FEE_TIERS } from '@/config/contracts';
 import { useTokenList } from './useTokenList';
+import { query } from '@/lib/graphql';
+import { GET_POOLS_QUERY, GET_POOL_BY_ADDRESS_QUERY } from '@/lib/graphql-queries';
+import { SubgraphPoolsResponse, SubgraphPoolResponse } from '@/types/subgraph';
+import { subgraphPoolToPool } from '@/lib/subgraph-utils';
 
 // Helper function to calculate price from sqrtPriceX96
 function calculatePriceFromSqrtPriceX96(sqrtPriceX96: bigint, token0Decimals: number, token1Decimals: number): number {
@@ -315,18 +319,37 @@ export function usePools() {
     fetchPoolsFromFactory();
   }, [publicClient, tokens]);
 
-  // Fetch pool data for all addresses
+  // Fetch pool data from subgraph first, then enhance with contract data if needed
   useEffect(() => {
-    if (!publicClient || poolAddresses.length === 0) {
-      setIsLoading(false);
-      return;
-    }
-
-    const fetchAllPools = async () => {
+    const fetchPoolsFromSubgraph = async () => {
       try {
         setIsLoading(true);
         
-        // Fetch pool data for all addresses in parallel (with limit to avoid overwhelming)
+        // Try to fetch pools from subgraph
+        try {
+          const response = await query<SubgraphPoolsResponse>(GET_POOLS_QUERY, {
+            first: 100,
+            skip: 0,
+            orderBy: 'totalValueLockedUSD',
+            orderDirection: 'desc',
+          });
+
+          if (response.pools && response.pools.length > 0) {
+            const subgraphPools = response.pools.map(subgraphPoolToPool);
+            setPools(subgraphPools);
+            setIsLoading(false);
+            return;
+          }
+        } catch (subgraphError) {
+          console.warn('Failed to fetch pools from subgraph, falling back to contracts:', subgraphError);
+        }
+
+        // Fallback to contract-based fetching if subgraph fails
+        if (!publicClient || poolAddresses.length === 0) {
+          setIsLoading(false);
+          return;
+        }
+
         const batchSize = 10;
         const allPools: Pool[] = [];
 
@@ -346,7 +369,7 @@ export function usePools() {
       }
     };
 
-    fetchAllPools();
+    fetchPoolsFromSubgraph();
   }, [poolAddresses, publicClient]);
 
   return { pools, isLoading };

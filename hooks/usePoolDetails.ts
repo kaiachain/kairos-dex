@@ -5,6 +5,10 @@ import { erc20Abi } from 'viem';
 import { Pool_ABI } from '@/abis/Pool';
 import { formatUnits } from '@/lib/utils';
 import { Token } from '@/types/token';
+import { query } from '@/lib/graphql';
+import { GET_POOL_BY_ADDRESS_QUERY, GET_POOL_DAY_DATA_QUERY, GET_POOL_HOUR_DATA_QUERY } from '@/lib/graphql-queries';
+import { SubgraphPoolResponse } from '@/types/subgraph';
+import { subgraphPoolToPool } from '@/lib/subgraph-utils';
 
 // Helper function to calculate price from sqrtPriceX96
 function calculatePriceFromSqrtPriceX96(sqrtPriceX96: bigint, token0Decimals: number, token1Decimals: number): number {
@@ -143,74 +147,109 @@ export function usePoolDetails(poolAddress: string) {
     isLoadingToken1Name ||
     isLoadingToken1Decimals;
 
+  // Fetch from subgraph first
   useEffect(() => {
-    if (isAnyLoading) {
-      setIsLoading(true);
-      return;
-    }
-
-    if (
-      !token0Address ||
-      !token1Address ||
-      fee === undefined ||
-      !slot0 ||
-      !token0Symbol ||
-      !token0Name ||
-      token0Decimals === undefined ||
-      !token1Symbol ||
-      !token1Name ||
-      token1Decimals === undefined
-    ) {
+    if (!normalizedAddress || !poolAddress) {
       setIsLoading(false);
       setPool(null);
       return;
     }
 
-    try {
-      const sqrtPriceX96 = (slot0 as any)[0] as bigint;
-      const currentPrice = calculatePriceFromSqrtPriceX96(
-        sqrtPriceX96,
-        Number(token0Decimals),
-        Number(token1Decimals)
-      );
+    const fetchPoolFromSubgraph = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Try to fetch from subgraph
+        try {
+          const response = await query<SubgraphPoolResponse>(GET_POOL_BY_ADDRESS_QUERY, {
+            id: normalizedAddress.toLowerCase(),
+          });
 
-      const token0: Token = {
-        address: token0Address as string,
-        symbol: token0Symbol as string,
-        name: token0Name as string,
-        decimals: Number(token0Decimals),
-      };
+          if (response.pool) {
+            const poolData = subgraphPoolToPool(response.pool);
+            setPool(poolData);
+            setIsLoading(false);
+            return;
+          }
+        } catch (subgraphError) {
+          console.warn('Failed to fetch pool from subgraph, falling back to contracts:', subgraphError);
+        }
 
-      const token1: Token = {
-        address: token1Address as string,
-        symbol: token1Symbol as string,
-        name: token1Name as string,
-        decimals: Number(token1Decimals),
-      };
+        // Fallback to contract-based fetching
+        if (isAnyLoading) {
+          setIsLoading(true);
+          return;
+        }
 
-      // For now, set volumes, TVL, and APR to 0
-      // In production, these would come from a subgraph or event indexing
-      const poolData: Pool = {
-        address: normalizedAddress || poolAddress,
-        token0,
-        token1,
-        feeTier: Number(fee) / 10000, // Convert from basis points to percentage
-        tvl: 0, // Would need to calculate from liquidity and reserves
-        volume24h: 0, // Would need from subgraph/events
-        volume7d: 0, // Would need from subgraph/events
-        volume30d: 0, // Would need from subgraph/events
-        apr: 0, // Would need to calculate from fees and TVL
-        currentPrice,
-        createdAt: Math.floor(Date.now() / 1000), // Would need from contract creation block
-      };
+        if (
+          !token0Address ||
+          !token1Address ||
+          fee === undefined ||
+          !slot0 ||
+          !token0Symbol ||
+          !token0Name ||
+          token0Decimals === undefined ||
+          !token1Symbol ||
+          !token1Name ||
+          token1Decimals === undefined
+        ) {
+          setIsLoading(false);
+          setPool(null);
+          return;
+        }
 
-      setPool(poolData);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error constructing pool data:', error);
-      setPool(null);
-      setIsLoading(false);
-    }
+        try {
+          const sqrtPriceX96 = (slot0 as any)[0] as bigint;
+          const currentPrice = calculatePriceFromSqrtPriceX96(
+            sqrtPriceX96,
+            Number(token0Decimals),
+            Number(token1Decimals)
+          );
+
+          const token0: Token = {
+            address: token0Address as string,
+            symbol: token0Symbol as string,
+            name: token0Name as string,
+            decimals: Number(token0Decimals),
+          };
+
+          const token1: Token = {
+            address: token1Address as string,
+            symbol: token1Symbol as string,
+            name: token1Name as string,
+            decimals: Number(token1Decimals),
+          };
+
+          // Fallback pool data without subgraph metrics
+          const poolData: Pool = {
+            address: normalizedAddress || poolAddress,
+            token0,
+            token1,
+            feeTier: Number(fee) / 10000,
+            tvl: 0,
+            volume24h: 0,
+            volume7d: 0,
+            volume30d: 0,
+            apr: 0,
+            currentPrice,
+            createdAt: Math.floor(Date.now() / 1000),
+          };
+
+          setPool(poolData);
+          setIsLoading(false);
+        } catch (error) {
+          console.error('Error constructing pool data:', error);
+          setPool(null);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error fetching pool:', error);
+        setIsLoading(false);
+        setPool(null);
+      }
+    };
+
+    fetchPoolFromSubgraph();
   }, [
     poolAddress,
     normalizedAddress,

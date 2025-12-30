@@ -68,6 +68,11 @@ export const CONTRACT_WRAPPED_NATIVE_TOKEN =
 export const WALLETCONNECT_PROJECT_ID =
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
 
+// The Graph Subgraph
+export const SUBGRAPH_URL =
+  process.env.NEXT_PUBLIC_SUBGRAPH_URL ||
+  "https://api.studio.thegraph.com/query/102730/kairos-dex/version/latest";
+
 // App Configuration
 export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Uniswap V3 DEX";
 export const IS_TESTNET =
