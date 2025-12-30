@@ -76,6 +76,7 @@ export const MINT_FRAGMENT = `
       token0Price
       token1Price
       sqrtPrice
+      tick
     }
     owner
     amount
@@ -114,6 +115,7 @@ export const BURN_FRAGMENT = `
       token0Price
       token1Price
       sqrtPrice
+      tick
     }
     owner
     amount
@@ -151,6 +153,8 @@ export const COLLECT_FRAGMENT = `
       feeTier
       token0Price
       token1Price
+      sqrtPrice
+      tick
     }
     owner
     amount0
@@ -260,7 +264,7 @@ export const GET_POSITION_EVENTS_QUERY = `
   ${COLLECT_FRAGMENT}
   query GetPositionEvents($owner: Bytes!, $first: Int, $skip: Int) {
     mints(
-      where: { owner: $owner }
+      where: { origin: $owner }
       first: $first
       skip: $skip
       orderBy: timestamp
@@ -269,7 +273,7 @@ export const GET_POSITION_EVENTS_QUERY = `
       ...MintFields
     }
     burns(
-      where: { owner: $owner }
+      where: { origin: $owner }
       first: $first
       skip: $skip
       orderBy: timestamp
