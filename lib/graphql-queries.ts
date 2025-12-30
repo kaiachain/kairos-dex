@@ -170,7 +170,6 @@ export const GET_POOLS_QUERY = `
       skip: $skip
       orderBy: $orderBy
       orderDirection: $orderDirection
-      where: { totalValueLockedUSD_gt: "0" }
     ) {
       ...PoolFields
     }
