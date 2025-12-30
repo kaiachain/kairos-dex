@@ -10,12 +10,14 @@ interface TokenSelectorProps {
   selectedToken: Token | null;
   onTokenSelect: (token: Token | null) => void;
   excludeToken?: Token | null;
+  disabled?: boolean;
 }
 
 export function TokenSelector({
   selectedToken,
   onTokenSelect,
   excludeToken,
+  disabled = false,
 }: TokenSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,8 +43,13 @@ export function TokenSelector({
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors min-w-[120px]"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg transition-colors min-w-[120px] ${
+          disabled 
+            ? 'opacity-50 cursor-not-allowed' 
+            : 'hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer'
+        }`}
       >
         {selectedToken ? (
           <>

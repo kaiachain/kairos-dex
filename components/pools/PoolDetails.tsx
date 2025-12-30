@@ -34,6 +34,7 @@ export function PoolDetails({ poolAddress }: PoolDetailsProps) {
           initialToken0={pool.token0}
           initialToken1={pool.token1}
           initialFee={pool.feeTier}
+          disableTokenSelection={true}
         />
       </div>
     );

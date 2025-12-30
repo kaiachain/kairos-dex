@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { TokenSelector } from '@/components/swap/TokenSelector';
 import { Token } from '@/types/token';
 import { PriceRangeSelector } from './PriceRangeSelector';
-import { useWriteContract, useAccount } from 'wagmi';
+import { useWriteContract, useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { CONTRACTS } from '@/config/contracts';
 import { PositionManager_ABI } from '@/abis/PositionManager';
 import { parseUnits, formatNumber, formatBalance } from '@/lib/utils';
@@ -14,12 +14,14 @@ interface AddLiquidityProps {
   initialToken0?: Token | null;
   initialToken1?: Token | null;
   initialFee?: number; // Fee tier as percentage (e.g., 0.3 for 0.3%)
+  disableTokenSelection?: boolean; // Disable token selection when adding liquidity to a specific pool
 }
 
 export function AddLiquidity({ 
   initialToken0 = null, 
   initialToken1 = null, 
-  initialFee 
+  initialFee,
+  disableTokenSelection = false
 }: AddLiquidityProps = {}) {
   const [token0, setToken0] = useState<Token | null>(initialToken0 || null);
   const [token1, setToken1] = useState<Token | null>(initialToken1 || null);
@@ -28,9 +30,15 @@ export function AddLiquidity({
   const [amount1, setAmount1] = useState('');
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
   const [fullRange, setFullRange] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const { address } = useAccount();
-  const { writeContract: addLiquidity } = useWriteContract();
+  const { writeContract: addLiquidity, data: hash } = useWriteContract();
+
+  // Wait for transaction confirmation
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
 
   // Auto-populate tokens and fee when initial values are provided
   useEffect(() => {
@@ -46,8 +54,30 @@ export function AddLiquidity({
   }, [initialToken0, initialToken1, initialFee]);
 
   // Get token balances
-  const { data: balance0, isLoading: isLoadingBalance0 } = useTokenBalance(token0);
-  const { data: balance1, isLoading: isLoadingBalance1 } = useTokenBalance(token1);
+  const { data: balance0, isLoading: isLoadingBalance0, refetch: refetchBalance0 } = useTokenBalance(token0);
+  const { data: balance1, isLoading: isLoadingBalance1, refetch: refetchBalance1 } = useTokenBalance(token1);
+
+  // Reset amounts and refetch balances when transaction is confirmed
+  useEffect(() => {
+    if (isConfirmed && !showSuccess) {
+      // Show success message
+      setShowSuccess(true);
+      
+      // Reset amounts
+      setAmount0('');
+      setAmount1('');
+      
+      // Refetch token balances
+      refetchBalance0();
+      refetchBalance1();
+      
+      // Hide success message after 3 seconds
+      const timer = setTimeout(() => {
+        setShowSuccess(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isConfirmed, showSuccess, refetchBalance0, refetchBalance1]);
 
   // Validation errors
   const errors = useMemo(() => {
@@ -82,6 +112,9 @@ export function AddLiquidity({
 
   const handleAddLiquidity = () => {
     if (!token0 || !token1 || !amount0 || !amount1) return;
+
+    // Reset success state when starting a new transaction
+    setShowSuccess(false);
 
     // Implementation would calculate tick ranges and call mint function
     // This is a simplified version
@@ -156,6 +189,7 @@ export function AddLiquidity({
               selectedToken={token0}
               onTokenSelect={setToken0}
               excludeToken={token1}
+              disabled={disableTokenSelection}
             />
           </div>
         </div>
@@ -194,6 +228,7 @@ export function AddLiquidity({
               selectedToken={token1}
               onTokenSelect={setToken1}
               excludeToken={token0}
+              disabled={disableTokenSelection}
             />
           </div>
         </div>
@@ -203,7 +238,10 @@ export function AddLiquidity({
           <select
             value={fee}
             onChange={(e) => setFee(parseInt(e.target.value))}
-            className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+            disabled={disableTokenSelection}
+            className={`w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none ${
+              disableTokenSelection ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             <option value={100}>0.01%</option>
             <option value={500}>0.05%</option>
@@ -223,10 +261,10 @@ export function AddLiquidity({
 
         <button
           onClick={handleAddLiquidity}
-          disabled={!token0 || !token1 || !amount0 || !amount1 || hasErrors}
+          disabled={!token0 || !token1 || !amount0 || !amount1 || hasErrors || isConfirming}
           className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Add Liquidity
+          {isConfirming ? 'Confirming...' : showSuccess ? 'Transaction Confirmed!' : 'Add Liquidity'}
         </button>
       </div>
     </div>
