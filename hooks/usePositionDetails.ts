@@ -20,8 +20,8 @@ function parsePositionId(tokenId: string): {
     return null;
   }
   return {
-    owner: parts[0],
-    pool: parts[1],
+    owner: parts[0].toLowerCase(),
+    pool: parts[1].toLowerCase(),
     tickLower: parts[2],
     tickUpper: parts[3],
   };

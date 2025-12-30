@@ -34,7 +34,7 @@ export const POOL_FRAGMENT = `
     createdAtBlockNumber
     token0Price
     token1Price
-    poolDayData(orderBy: date, orderDirection: desc, first: 1) {
+    poolDayData(orderBy: date, orderDirection: desc, first: 30) {
       volumeUSD
       feesUSD
       tvlUSD
