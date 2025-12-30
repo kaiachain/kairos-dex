@@ -1,19 +1,29 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { TokenSelector } from '@/components/swap/TokenSelector';
 import { Token } from '@/types/token';
 import { PriceRangeSelector } from './PriceRangeSelector';
 import { useWriteContract, useAccount } from 'wagmi';
 import { CONTRACTS } from '@/config/contracts';
 import { PositionManager_ABI } from '@/abis/PositionManager';
-import { parseUnits, formatNumber } from '@/lib/utils';
+import { parseUnits, formatNumber, formatBalance } from '@/lib/utils';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
 
-export function AddLiquidity() {
-  const [token0, setToken0] = useState<Token | null>(null);
-  const [token1, setToken1] = useState<Token | null>(null);
-  const [fee, setFee] = useState(3000);
+interface AddLiquidityProps {
+  initialToken0?: Token | null;
+  initialToken1?: Token | null;
+  initialFee?: number; // Fee tier as percentage (e.g., 0.3 for 0.3%)
+}
+
+export function AddLiquidity({ 
+  initialToken0 = null, 
+  initialToken1 = null, 
+  initialFee 
+}: AddLiquidityProps = {}) {
+  const [token0, setToken0] = useState<Token | null>(initialToken0 || null);
+  const [token1, setToken1] = useState<Token | null>(initialToken1 || null);
+  const [fee, setFee] = useState(initialFee ? Math.round(initialFee * 10000) : 3000);
   const [amount0, setAmount0] = useState('');
   const [amount1, setAmount1] = useState('');
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
@@ -21,6 +31,19 @@ export function AddLiquidity() {
 
   const { address } = useAccount();
   const { writeContract: addLiquidity } = useWriteContract();
+
+  // Auto-populate tokens and fee when initial values are provided
+  useEffect(() => {
+    if (initialToken0) {
+      setToken0(initialToken0);
+    }
+    if (initialToken1) {
+      setToken1(initialToken1);
+    }
+    if (initialFee !== undefined) {
+      setFee(Math.round(initialFee * 10000)); // Convert percentage to basis points
+    }
+  }, [initialToken0, initialToken1, initialFee]);
 
   // Get token balances
   const { data: balance0, isLoading: isLoadingBalance0 } = useTokenBalance(token0);
@@ -36,7 +59,7 @@ export function AddLiquidity() {
       
       if (!isNaN(amount0Num) && !isNaN(balance0Num)) {
         if (amount0Num > balance0Num) {
-          errs.amount0 = `Insufficient balance. You have ${formatNumber(balance0, 6)} ${token0.symbol}`;
+          errs.amount0 = `Insufficient balance. You have ${formatBalance(balance0, 2)} ${token0.symbol}`;
         }
       }
     }
@@ -47,7 +70,7 @@ export function AddLiquidity() {
       
       if (!isNaN(amount1Num) && !isNaN(balance1Num)) {
         if (amount1Num > balance1Num) {
-          errs.amount1 = `Insufficient balance. You have ${formatNumber(balance1, 6)} ${token1.symbol}`;
+          errs.amount1 = `Insufficient balance. You have ${formatBalance(balance1, 2)} ${token1.symbol}`;
         }
       }
     }
@@ -107,7 +130,7 @@ export function AddLiquidity() {
                 {isLoadingBalance0 ? (
                   'Loading...'
                 ) : balance0 ? (
-                  `Balance: ${formatNumber(balance0, 6)} ${token0.symbol}`
+                  `Balance: ${formatBalance(balance0, 2)} ${token0.symbol}`
                 ) : (
                   'Balance: 0'
                 )}
@@ -145,7 +168,7 @@ export function AddLiquidity() {
                 {isLoadingBalance1 ? (
                   'Loading...'
                 ) : balance1 ? (
-                  `Balance: ${formatNumber(balance1, 6)} ${token1.symbol}`
+                  `Balance: ${formatBalance(balance1, 2)} ${token1.symbol}`
                 ) : (
                   'Balance: 0'
                 )}

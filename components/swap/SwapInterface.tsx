@@ -10,6 +10,7 @@ import { ArrowDownUp } from 'lucide-react';
 import { Token } from '@/types/token';
 import { useSwapQuote } from '@/hooks/useSwapQuote';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
+import { formatBalance } from '@/lib/utils';
 
 export function SwapInterface() {
   const { isConnected } = useAccount();
@@ -66,7 +67,7 @@ export function SwapInterface() {
                 onClick={handleMax}
                 className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
               >
-                Balance: {balanceIn}
+                Balance: {formatBalance(balanceIn, 2)}
               </button>
             )}
           </div>

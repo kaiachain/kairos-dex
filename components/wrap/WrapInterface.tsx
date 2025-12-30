@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAccount, useBalance, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { CONTRACT_WRAPPED_NATIVE_TOKEN, NATIVE_CURRENCY_SYMBOL } from '@/config/env';
 import { WKAIA_ABI } from '@/abis/WKAIA';
-import { parseUnits, formatUnits } from '@/lib/utils';
+import { parseUnits, formatUnits, formatBalance } from '@/lib/utils';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
 import { Token } from '@/types/token';
 
@@ -138,7 +138,7 @@ export function WrapInterface() {
                 onClick={handleMax}
                 className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
               >
-                Balance: {isLoadingBalance ? '...' : currentBalance}
+                Balance: {isLoadingBalance ? '...' : formatBalance(currentBalance, 2)}
               </button>
             )}
           </div>
@@ -186,12 +186,12 @@ export function WrapInterface() {
             <label className="text-sm text-gray-600 dark:text-gray-400">To</label>
             {!isWrapping && nativeBalance && (
               <span className="text-xs text-gray-600 dark:text-gray-400">
-                Balance: {nativeBalance.formatted}
+                Balance: {formatBalance(nativeBalance.formatted, 2)}
               </span>
             )}
             {isWrapping && wkaiaBalance && (
               <span className="text-xs text-gray-600 dark:text-gray-400">
-                Balance: {wkaiaBalance}
+                Balance: {formatBalance(wkaiaBalance, 2)}
               </span>
             )}
           </div>

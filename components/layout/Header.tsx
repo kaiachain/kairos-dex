@@ -2,7 +2,7 @@
 
 import { useAccount, useConnect, useDisconnect, useBalance } from "wagmi";
 import { Wallet, LogOut, Copy, ExternalLink } from "lucide-react";
-import { formatAddress, formatNumber } from "@/lib/utils";
+import { formatAddress, formatNumber, formatBalance } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { BLOCK_EXPLORER_URL } from "@/config/env";
@@ -46,7 +46,7 @@ export function Header() {
             <div className="hidden md:flex items-center space-x-2 text-sm">
               <span className="text-gray-600 dark:text-gray-400">Balance:</span>
               <span className="font-medium">
-                {formatNumber(balance.formatted, 4)} {balance.symbol}
+                {formatBalance(balance.formatted, 2)} {balance.symbol}
               </span>
             </div>
           )}

@@ -19,6 +19,41 @@ export function formatNumber(value: number | string, decimals = 2): string {
   }).format(num);
 }
 
+export function formatBalance(value: number | string, decimals = 2): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0';
+  if (num === 0) {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(0);
+  }
+  
+  const absNum = Math.abs(num);
+  
+  if (absNum >= 1000000) {
+    // Millions
+    const millions = num / 1000000;
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(millions) + 'M';
+  } else if (absNum >= 1000) {
+    // Thousands
+    const thousands = num / 1000;
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(thousands) + 'K';
+  } else {
+    // Less than 1000, format normally
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(num);
+  }
+}
+
 export function formatCurrency(value: number | string, currency = 'USD'): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return '$0.00';

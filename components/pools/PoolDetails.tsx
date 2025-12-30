@@ -30,7 +30,11 @@ export function PoolDetails({ poolAddress }: PoolDetailsProps) {
         >
           ← Back to Pool
         </button>
-        <AddLiquidity />
+        <AddLiquidity 
+          initialToken0={pool.token0}
+          initialToken1={pool.token1}
+          initialFee={pool.feeTier}
+        />
       </div>
     );
   }
