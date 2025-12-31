@@ -9,6 +9,8 @@ interface PriceRangeSelectorProps {
   onPriceRangeChange: (range: { min: string; max: string }) => void;
   fullRange: boolean;
   onFullRangeChange: (fullRange: boolean) => void;
+  calculatedPriceRange?: { min: number | null; max: number | null };
+  currentTick?: number | null;
 }
 
 export function PriceRangeSelector({
@@ -18,6 +20,8 @@ export function PriceRangeSelector({
   onPriceRangeChange,
   fullRange,
   onFullRangeChange,
+  calculatedPriceRange,
+  currentTick,
 }: PriceRangeSelectorProps) {
   return (
     <div className="space-y-4">
@@ -71,12 +75,22 @@ export function PriceRangeSelector({
           </span>
         </div>
         {!fullRange && (
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-gray-400">Range</span>
-            <span className="font-semibold">
-              {priceRange.min || '0'} - {priceRange.max || '∞'}
-            </span>
-          </div>
+          <>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Entered Range</span>
+              <span className="font-semibold">
+                {priceRange.min || '0'} - {priceRange.max || '∞'} {token1?.symbol} per {token0?.symbol}
+              </span>
+            </div>
+            {calculatedPriceRange && calculatedPriceRange.min !== null && calculatedPriceRange.max !== null && (
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Calculated Range</span>
+                <span className="font-semibold text-primary-600 dark:text-primary-400">
+                  {calculatedPriceRange.min.toFixed(4)} - {calculatedPriceRange.max.toFixed(4)} {token1?.symbol} per {token0?.symbol}
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

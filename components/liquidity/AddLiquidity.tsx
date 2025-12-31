@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { TokenSelector } from "@/components/swap/TokenSelector";
 import { Token } from "@/types/token";
+import { Pool } from "@/types/pool";
 import { PriceRangeSelector } from "./PriceRangeSelector";
 import {
   useWriteContract,
@@ -19,15 +20,21 @@ import {
   formatNumber,
   formatBalance,
   priceToSqrtPriceX96,
+  formatAddress,
+  formatCurrency,
 } from "@/lib/utils";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
+import { usePools } from "@/hooks/usePools";
+import { calculatePriceFromTick } from "@/lib/subgraph-utils";
 import { erc20Abi } from "viem";
+import { Search } from "lucide-react";
 
 interface AddLiquidityProps {
   initialToken0?: Token | null;
   initialToken1?: Token | null;
   initialFee?: number; // Fee tier as percentage (e.g., 0.3 for 0.3%)
   disableTokenSelection?: boolean; // Disable token selection when adding liquidity to a specific pool
+  fromPositionsPage?: boolean; // Indicates if coming from Positions page
 }
 
 export function AddLiquidity({
@@ -35,6 +42,7 @@ export function AddLiquidity({
   initialToken1 = null,
   initialFee,
   disableTokenSelection = false,
+  fromPositionsPage = false,
 }: AddLiquidityProps = {}) {
   const [token0, setToken0] = useState<Token | null>(initialToken0 || null);
   const [token1, setToken1] = useState<Token | null>(initialToken1 || null);
@@ -49,6 +57,12 @@ export function AddLiquidity({
   const [showTxError, setShowTxError] = useState(false);
   const [initialPrice, setInitialPrice] = useState("");
   const [showInitPrompt, setShowInitPrompt] = useState(false);
+  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const [poolSearchQuery, setPoolSearchQuery] = useState("");
+  const [calculatedPriceRange, setCalculatedPriceRange] = useState<{ min: number | null; max: number | null }>({ min: null, max: null });
+  
+  // Fetch pools for selection when coming from Positions page
+  const { pools, isLoading: isLoadingPools } = usePools();
 
   const { address } = useAccount();
   const {
@@ -139,6 +153,32 @@ export function AddLiquidity({
     }
   }, [initialToken0, initialToken1, initialFee]);
 
+  // Auto-populate tokens and fee when pool is selected
+  useEffect(() => {
+    if (selectedPool) {
+      setToken0(selectedPool.token0);
+      setToken1(selectedPool.token1);
+      setFee(Math.round(selectedPool.feeTier * 10000)); // Convert percentage to basis points
+    }
+  }, [selectedPool]);
+
+  // Filter pools based on search query
+  const filteredPools = useMemo(() => {
+    if (!poolSearchQuery) return pools;
+    const query = poolSearchQuery.toLowerCase();
+    return pools.filter(
+      (pool) =>
+        pool.token0.symbol.toLowerCase().includes(query) ||
+        pool.token1.symbol.toLowerCase().includes(query) ||
+        pool.token0.name.toLowerCase().includes(query) ||
+        pool.token1.name.toLowerCase().includes(query) ||
+        pool.address.toLowerCase().includes(query)
+    );
+  }, [pools, poolSearchQuery]);
+
+  // Determine if we should show pool selector
+  const showPoolSelector = fromPositionsPage && !selectedPool && !initialToken0 && !initialToken1;
+
   // Get token balances
   const {
     data: balance0,
@@ -204,6 +244,10 @@ export function AddLiquidity({
   const isPoolInitialized = slot0 ? (slot0 as any)[0] !== BigInt(0) : false;
   const poolNeedsInitialization =
     poolExists && !isPoolInitialized && !isLoadingSlot0;
+
+  // Extract current tick from slot0
+  // slot0 returns: [sqrtPriceX96, tick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked]
+  const currentTick = slot0 ? Number((slot0 as any)[1]) : null;
 
   // Show initialization prompt when pool needs initialization
   useEffect(() => {
@@ -366,7 +410,20 @@ export function AddLiquidity({
   };
 
   const handleAddLiquidity = () => {
-    if (!token0 || !token1 || !amount0 || !amount1) return;
+    if (!token0 || !token1 || !amount0 || !amount1) {
+      console.error("Missing tokens or amounts:", { token0, token1, amount0, amount1 });
+      return;
+    }
+
+    // Validate amounts are valid numbers and greater than 0
+    const amount0Num = parseFloat(amount0);
+    const amount1Num = parseFloat(amount1);
+    
+    if (isNaN(amount0Num) || isNaN(amount1Num) || amount0Num <= 0 || amount1Num <= 0) {
+      console.error("Invalid amounts:", { amount0: amount0Num, amount1: amount1Num });
+      alert("Please enter valid amounts greater than 0 for both tokens");
+      return;
+    }
 
     // Check if pool needs initialization
     if (poolNeedsInitialization) {
@@ -388,10 +445,23 @@ export function AddLiquidity({
     }
 
     // Sort tokens by address (Uniswap V3 requirement)
-    const [t0, t1] =
-      token0.address < token1.address ? [token0, token1] : [token1, token0];
-    const [amt0, amt1] =
-      token0.address < token1.address ? [amount0, amount1] : [amount1, amount0];
+    // token0 and token1 are as displayed in UI
+    // t0 and t1 are sorted by address (t0 < t1)
+    const isToken0First = token0.address.toLowerCase() < token1.address.toLowerCase();
+    const t0 = isToken0First ? token0 : token1;
+    const t1 = isToken0First ? token1 : token0;
+    
+    // Map amounts to sorted tokens
+    // If token0 comes first in sorted order, amount0 maps to t0, amount1 maps to t1
+    // If token1 comes first in sorted order, amount0 maps to t1, amount1 maps to t0
+    const amt0 = isToken0First ? amount0 : amount1;
+    const amt1 = isToken0First ? amount1 : amount0;
+
+    // Validate amounts are valid numbers
+    if (!amt0 || !amt1 || isNaN(parseFloat(amt0)) || isNaN(parseFloat(amt1))) {
+      console.error("Invalid amounts:", { amt0, amt1 });
+      return;
+    }
 
     // Calculate tick range
     // For full range, use min/max ticks
@@ -405,23 +475,158 @@ export function AddLiquidity({
       // Full range: use min and max ticks
       tickLower = -887272;
       tickUpper = 887272;
+      // Full range - clear calculated range
+      setCalculatedPriceRange({ min: null, max: null });
     } else {
-      // For custom range, we need proper tick calculation
-      // For now, default to a range around current price
-      // This is a simplified approach - in production, use Uniswap V3 SDK
+      // For custom range, calculate ticks based on current price
       const tickSpacing =
         fee === 100 ? 1 : fee === 500 ? 10 : fee === 3000 ? 60 : 200;
-      const currentTick = 0; // Would need to fetch from pool
-      tickLower = Math.floor((currentTick - 1000) / tickSpacing) * tickSpacing;
-      tickUpper = Math.ceil((currentTick + 1000) / tickSpacing) * tickSpacing;
+      
+      // Use actual current tick from pool, or default to 0 if not available
+      const poolCurrentTick = currentTick !== null ? currentTick : 0;
+      
+      // Parse price range from user input
+      const minPrice = priceRange.min ? parseFloat(priceRange.min) : null;
+      const maxPrice = priceRange.max ? parseFloat(priceRange.max) : null;
+      
+      if (minPrice !== null && maxPrice !== null && !isNaN(minPrice) && !isNaN(maxPrice) && minPrice > 0 && maxPrice > 0) {
+        // User provided custom price range - convert absolute prices to ticks
+        // Price entered by user is in "human-readable" format: token1 per token0
+        // Formula: tick = log(price / decimalsAdjustment) / log(1.0001)
+        // where decimalsAdjustment = 10^(token0Decimals - token1Decimals)
+        
+        // Calculate decimals adjustment (same as in calculatePriceFromTick)
+        // Use sorted tokens for decimals (t0 and t1 are defined above)
+        const sortedToken0ForDecimals = token0.address.toLowerCase() < token1.address.toLowerCase() ? token0 : token1;
+        const sortedToken1ForDecimals = token0.address.toLowerCase() < token1.address.toLowerCase() ? token1 : token0;
+        const decimalsAdjustment = 10 ** (sortedToken0ForDecimals.decimals - sortedToken1ForDecimals.decimals);
+        
+        // Convert absolute prices to ticks
+        // The user enters prices like "0.5" meaning 0.5 token1 per token0
+        // But the raw price (before decimals adjustment) is price / decimalsAdjustment
+        const LN_1_0001 = Math.log(1.0001);
+        
+        const priceToTick = (price: number): number => {
+          // User enters price in human-readable format (already accounting for decimals in their mind)
+          // But we need the raw price: rawPrice = price / decimalsAdjustment
+          // Then: tick = log(rawPrice) / log(1.0001)
+          const rawPrice = price / decimalsAdjustment;
+          if (rawPrice <= 0) return -887272; // Min tick
+          const tick = Math.log(rawPrice) / LN_1_0001;
+          return Math.floor(tick);
+        };
+        
+        // Calculate ticks from absolute prices
+        const tickLowerFromPrice = priceToTick(minPrice);
+        const tickUpperFromPrice = priceToTick(maxPrice);
+        
+        // Round to tick spacing
+        tickLower = Math.floor(tickLowerFromPrice / tickSpacing) * tickSpacing;
+        tickUpper = Math.ceil(tickUpperFromPrice / tickSpacing) * tickSpacing;
+        
+        // Ensure tickLower < tickUpper
+        if (tickLower >= tickUpper) {
+          const midTick = Math.floor((tickLower + tickUpper) / 2 / tickSpacing) * tickSpacing;
+          tickLower = midTick - tickSpacing;
+          tickUpper = midTick + tickSpacing;
+        }
+      } else {
+        // No custom range provided, use a range around current price
+        // Default to ±10% around current price (approximately ±1000 ticks)
+        const defaultTickRange = 1000;
+        tickLower = Math.floor((poolCurrentTick - defaultTickRange) / tickSpacing) * tickSpacing;
+        tickUpper = Math.ceil((poolCurrentTick + defaultTickRange) / tickSpacing) * tickSpacing;
+      }
 
+      // CRITICAL: Ensure range includes current tick so both tokens are used
+      // If current tick is outside the range, adjust the range to include it
+      if (poolCurrentTick !== null && poolCurrentTick !== 0) {
+        if (tickLower > poolCurrentTick) {
+          // Range is entirely above current price - adjust lower bound
+          tickLower = Math.floor(poolCurrentTick / tickSpacing) * tickSpacing;
+          console.warn("Price range was above current price. Adjusted to include current price.");
+        }
+        if (tickUpper < poolCurrentTick) {
+          // Range is entirely below current price - adjust upper bound
+          tickUpper = Math.ceil(poolCurrentTick / tickSpacing) * tickSpacing;
+          console.warn("Price range was below current price. Adjusted to include current price.");
+        }
+      }
+      
       // Ensure tickLower < tickUpper
       if (tickLower >= tickUpper) {
         tickLower = tickUpper - tickSpacing;
       }
+      
+      // Clamp to valid tick range
+      tickLower = Math.max(tickLower, -887272);
+      tickUpper = Math.min(tickUpper, 887272);
+      
+      // Final validation: ensure current tick is within range
+      if (poolCurrentTick !== null && poolCurrentTick !== 0) {
+        if (poolCurrentTick < tickLower || poolCurrentTick > tickUpper) {
+          // Force include current tick
+          tickLower = Math.min(tickLower, Math.floor(poolCurrentTick / tickSpacing) * tickSpacing);
+          tickUpper = Math.max(tickUpper, Math.ceil(poolCurrentTick / tickSpacing) * tickSpacing);
+        }
+      }
+      
+      // Calculate actual price range from ticks for display
+      // Use sorted tokens for decimals
+      const sortedToken0ForDisplay = token0.address.toLowerCase() < token1.address.toLowerCase() ? token0 : token1;
+      const sortedToken1ForDisplay = token0.address.toLowerCase() < token1.address.toLowerCase() ? token1 : token0;
+      if (sortedToken0ForDisplay && sortedToken1ForDisplay) {
+        const priceMin = calculatePriceFromTick(tickLower, sortedToken0ForDisplay.decimals, sortedToken1ForDisplay.decimals);
+        const priceMax = calculatePriceFromTick(tickUpper, sortedToken0ForDisplay.decimals, sortedToken1ForDisplay.decimals);
+        setCalculatedPriceRange({ min: priceMin, max: priceMax });
+      }
     }
 
     if (!address) return;
+
+    // Parse amounts with proper decimals
+    let amount0Desired: bigint;
+    let amount1Desired: bigint;
+    
+    try {
+      amount0Desired = parseUnits(amt0, t0.decimals);
+      amount1Desired = parseUnits(amt1, t1.decimals);
+    } catch (error) {
+      console.error("Error parsing amounts:", error);
+      alert("Error parsing token amounts. Please check your inputs.");
+      return;
+    }
+
+    // Validate parsed amounts are greater than 0
+    if (amount0Desired === BigInt(0) || amount1Desired === BigInt(0)) {
+      console.error("Amounts must be greater than 0:", {
+        amount0Desired: amount0Desired.toString(),
+        amount1Desired: amount1Desired.toString(),
+      });
+      alert("Both token amounts must be greater than 0");
+      return;
+    }
+
+    // Log for debugging
+    console.log("Adding liquidity:", {
+      originalToken0: token0.symbol,
+      originalToken1: token1.symbol,
+      originalAmount0: amount0,
+      originalAmount1: amount1,
+      sortedToken0: t0.symbol,
+      sortedToken1: t1.symbol,
+      sortedAmount0: amt0,
+      sortedAmount1: amt1,
+      amount0Desired: amount0Desired.toString(),
+      amount1Desired: amount1Desired.toString(),
+      fee,
+      currentTick,
+      tickLower,
+      tickUpper,
+      fullRange,
+      priceRange,
+      tickInRange: currentTick !== null ? (currentTick >= tickLower && currentTick <= tickUpper) : "unknown",
+    });
 
     try {
       addLiquidity({
@@ -435,8 +640,8 @@ export function AddLiquidity({
             fee: fee,
             tickLower: tickLower,
             tickUpper: tickUpper,
-            amount0Desired: parseUnits(amt0, t0.decimals),
-            amount1Desired: parseUnits(amt1, t1.decimals),
+            amount0Desired: amount0Desired,
+            amount1Desired: amount1Desired,
             amount0Min: BigInt(0),
             amount1Min: BigInt(0),
             recipient: address,
@@ -454,6 +659,112 @@ export function AddLiquidity({
       <h2 className="text-2xl font-bold mb-6">Add Liquidity</h2>
 
       <div className="space-y-6">
+        {/* Pool Selector - shown when coming from Positions page */}
+        {showPoolSelector && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Select a Pool
+              </label>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Choose a pool to add liquidity to. The tokens and fee tier will be automatically populated.
+              </p>
+              
+              {/* Search input */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={poolSearchQuery}
+                  onChange={(e) => setPoolSearchQuery(e.target.value)}
+                  placeholder="Search pools by token name or address"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+                />
+              </div>
+
+              {/* Pool list */}
+              {isLoadingPools ? (
+                <div className="text-center py-8 text-gray-500">
+                  Loading pools...
+                </div>
+              ) : filteredPools.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  {poolSearchQuery ? "No pools found matching your search" : "No pools available"}
+                </div>
+              ) : (
+                <div className="max-h-96 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                  {filteredPools.map((pool) => (
+                    <button
+                      key={pool.address}
+                      onClick={() => setSelectedPool(pool)}
+                      className="w-full text-left p-4 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors border border-transparent hover:border-primary-300 dark:hover:border-primary-700"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex -space-x-2">
+                            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-xs font-semibold">
+                              {pool.token0.symbol[0]}
+                            </div>
+                            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-xs font-semibold">
+                              {pool.token1.symbol[0]}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="font-semibold">
+                              {pool.token0.symbol} / {pool.token1.symbol}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Fee: {pool.feeTier}%
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold">
+                            {formatCurrency(pool.tvl)}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            TVL
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
+                        {formatAddress(pool.address, 6)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Show message when pool is selected */}
+        {selectedPool && fromPositionsPage && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-800 dark:text-green-200 font-semibold mb-1">
+                  ✓ Pool Selected
+                </p>
+                <p className="text-green-700 dark:text-green-300 text-sm">
+                  {selectedPool.token0.symbol} / {selectedPool.token1.symbol} ({selectedPool.feeTier}% fee)
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedPool(null);
+                  setToken0(null);
+                  setToken1(null);
+                  setAmount0("");
+                  setAmount1("");
+                }}
+                className="text-sm text-green-700 dark:text-green-300 hover:underline"
+              >
+                Change Pool
+              </button>
+            </div>
+          </div>
+        )}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-sm font-medium">Token 0</label>
@@ -477,9 +788,10 @@ export function AddLiquidity({
                   setShowTxError(false);
                 }}
                 placeholder="0.0"
+                disabled={showPoolSelector}
                 className={`w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg outline-none ${
                   errors.amount0 ? "border-2 border-red-500" : "border-none"
-                }`}
+                } ${showPoolSelector ? "opacity-50 cursor-not-allowed" : ""}`}
               />
               {errors.amount0 && (
                 <p className="text-red-500 text-xs mt-1">{errors.amount0}</p>
@@ -489,7 +801,7 @@ export function AddLiquidity({
               selectedToken={token0}
               onTokenSelect={setToken0}
               excludeToken={token1}
-              disabled={disableTokenSelection}
+              disabled={disableTokenSelection || showPoolSelector || (fromPositionsPage && selectedPool !== null)}
             />
           </div>
         </div>
@@ -517,9 +829,10 @@ export function AddLiquidity({
                   setShowTxError(false);
                 }}
                 placeholder="0.0"
+                disabled={showPoolSelector}
                 className={`w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg outline-none ${
                   errors.amount1 ? "border-2 border-red-500" : "border-none"
-                }`}
+                } ${showPoolSelector ? "opacity-50 cursor-not-allowed" : ""}`}
               />
               {errors.amount1 && (
                 <p className="text-red-500 text-xs mt-1">{errors.amount1}</p>
@@ -529,7 +842,7 @@ export function AddLiquidity({
               selectedToken={token1}
               onTokenSelect={setToken1}
               excludeToken={token0}
-              disabled={disableTokenSelection}
+              disabled={disableTokenSelection || showPoolSelector || (fromPositionsPage && selectedPool !== null)}
             />
           </div>
         </div>
@@ -539,9 +852,9 @@ export function AddLiquidity({
           <select
             value={fee}
             onChange={(e) => setFee(parseInt(e.target.value))}
-            disabled={disableTokenSelection}
+            disabled={disableTokenSelection || showPoolSelector || (fromPositionsPage && selectedPool !== null)}
             className={`w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none ${
-              disableTokenSelection ? "opacity-50 cursor-not-allowed" : ""
+              disableTokenSelection || showPoolSelector || (fromPositionsPage && selectedPool !== null) ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
             <option value={100}>0.01%</option>
@@ -558,6 +871,8 @@ export function AddLiquidity({
           onPriceRangeChange={setPriceRange}
           fullRange={fullRange}
           onFullRangeChange={setFullRange}
+          calculatedPriceRange={calculatedPriceRange}
+          currentTick={currentTick}
         />
 
         {/* Error Display */}
@@ -570,13 +885,17 @@ export function AddLiquidity({
           </div>
         )}
 
-        {/* Warning for custom price range */}
+        {/* Info about token amounts and price range */}
         {!fullRange && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-            <p className="text-yellow-600 dark:text-yellow-400 text-sm">
-              Custom price ranges require proper tick calculations. For best
-              results, use Full Range.
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <p className="text-blue-600 dark:text-blue-400 text-sm mb-2">
+              <strong>Note:</strong> Token amounts will be automatically adjusted to the optimal ratio for the selected price range. The contract will use the required amounts and refund any excess.
             </p>
+            {calculatedPriceRange && calculatedPriceRange.min !== null && calculatedPriceRange.max !== null && (
+              <p className="text-blue-600 dark:text-blue-400 text-xs">
+                The calculated price range may differ slightly from your entered range due to tick spacing requirements.
+              </p>
+            )}
           </div>
         )}
 

@@ -222,15 +222,92 @@ export function subgraphPositionToPosition(
 /**
  * Calculate price from tick index
  * price = 1.0001^tick
+ *
+ * Note: Ticks at ±887272 represent the full range (min/max ticks in Uniswap V3)
+ * For these extreme ticks, we return special values to avoid numerical overflow
+ *
+ * @param tick - The tick index
+ * @param token0Decimals - Decimals of token0
+ * @param token1Decimals - Decimals of token1
+ * @returns Price of token1 in terms of token0 (adjusted for decimals)
  */
-function calculatePriceFromTick(
+export function calculatePriceFromTick(
   tick: number,
   token0Decimals: number,
   token1Decimals: number
 ): number {
-  const price = Math.pow(1.0001, tick);
+  // Handle edge cases for full range positions
+  // -887272 is min tick, 887272 is max tick
+  const MIN_TICK = -887272;
+  const MAX_TICK = 887272;
+
+  // Use a sentinel value that's clearly not a real price
+  // This is larger than any reasonable price but still finite
+  const FULL_RANGE_MAX_PRICE = 1e50;
+
+  if (tick >= MAX_TICK) {
+    // Max tick represents infinite price (token1/token0)
+    // Return a sentinel value that indicates full range
+    return FULL_RANGE_MAX_PRICE;
+  }
+
+  if (tick <= MIN_TICK) {
+    // Min tick represents zero price (token1/token0)
+    return 0;
+  }
+
+  // For normal ticks, use logarithms for numerical stability with large exponents
+  // price = 1.0001^tick = exp(tick * ln(1.0001))
+  // This is more numerically stable than Math.pow for large ticks
+  const LN_1_0001 = Math.log(1.0001);
+  let price: number;
+
+  // Calculate base price from tick
+  if (Math.abs(tick) > 100000) {
+    // For very large ticks, use logarithms to avoid overflow
+    const logPrice = tick * LN_1_0001;
+    // Check if result would overflow before calculating exp
+    if (logPrice > 700) {
+      // exp(700) is approximately 1e304, close to JS max
+      return FULL_RANGE_MAX_PRICE;
+    }
+    price = Math.exp(logPrice);
+    // Clamp to reasonable bounds
+    if (!isFinite(price) || price > FULL_RANGE_MAX_PRICE) {
+      return FULL_RANGE_MAX_PRICE;
+    }
+  } else {
+    // For smaller ticks, Math.pow is fine
+    price = Math.pow(1.0001, tick);
+    if (!isFinite(price)) {
+      return tick > 0 ? FULL_RANGE_MAX_PRICE : 0;
+    }
+  }
+
+  // Adjust for token decimals
+  // Price represents token1/token0, so we need to adjust for decimals
   const decimalsAdjustment = 10 ** (token0Decimals - token1Decimals);
-  return price * decimalsAdjustment;
+
+  // Check if adjustment would cause overflow
+  if (Math.abs(decimalsAdjustment) > 1e20) {
+    // Very large adjustment could cause issues, handle carefully
+    if (price > 1e30 / Math.abs(decimalsAdjustment)) {
+      return tick > 0 ? FULL_RANGE_MAX_PRICE : 0;
+    }
+  }
+
+  const adjustedPrice = price * decimalsAdjustment;
+
+  // Final safety check
+  if (
+    !isFinite(adjustedPrice) ||
+    adjustedPrice < 0 ||
+    adjustedPrice > FULL_RANGE_MAX_PRICE
+  ) {
+    return tick > 0 ? FULL_RANGE_MAX_PRICE : 0;
+  }
+
+  return adjustedPrice;
 }
 
 /**
@@ -345,6 +422,9 @@ export function aggregatePositionEvents(
       token0.decimals,
       token1.decimals
     );
+    
+    // Get current tick from pool (if available)
+    const currentTick = pool.tick ? parseInt(pool.tick, 10) : null;
 
     // Aggregate liquidity (mints add, burns subtract)
     let liquidity = BigInt(0);
@@ -421,6 +501,13 @@ export function aggregatePositionEvents(
         uncollectedFees,
         feesEarned,
         createdAt,
+        // Include token amounts for display
+        token0Amount: netToken0,
+        token1Amount: netToken1,
+        // Include tick information for accurate range checking
+        tickLower,
+        tickUpper,
+        currentTick: currentTick ?? undefined,
       });
     }
   });

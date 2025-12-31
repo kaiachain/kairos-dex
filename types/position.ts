@@ -1,4 +1,4 @@
-import { Token } from './token';
+import { Token } from "./token";
 
 export interface Position {
   tokenId: string;
@@ -13,5 +13,11 @@ export interface Position {
   uncollectedFees: number;
   feesEarned: number;
   createdAt: number;
+  // Token amounts in the position (calculated from mints/burns)
+  token0Amount?: number;
+  token1Amount?: number;
+  // Tick information for accurate range checking
+  tickLower?: number;
+  tickUpper?: number;
+  currentTick?: number;
 }
-

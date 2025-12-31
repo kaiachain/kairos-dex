@@ -58,6 +58,26 @@ export function formatBalance(value: number | string, decimals = 2): string {
   }
 }
 
+/**
+ * Format large integer values (like liquidity) without abbreviation
+ * Useful for displaying raw liquidity values that shouldn't be abbreviated
+ */
+export function formatLargeInteger(value: number | string): string {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "0";
+  if (num === 0) return "0";
+  
+  // For very large numbers, use scientific notation
+  if (Math.abs(num) >= 1e15) {
+    return num.toExponential(2);
+  }
+  
+  // Otherwise, format with commas but no abbreviation
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(num);
+}
+
 export function formatCurrency(
   value: number | string,
   currency = "USD"

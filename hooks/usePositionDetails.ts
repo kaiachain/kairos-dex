@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Position } from "@/types/position";
 import { query } from "@/lib/graphql";
 import { GET_POSITION_BY_TICKS_QUERY } from "@/lib/graphql-queries";
-import { SubgraphPositionByTicksResponse } from "@/types/subgraph";
+import { SubgraphPositionByTicksResponse, SubgraphMint, SubgraphBurn, SubgraphCollect } from "@/types/subgraph";
 import { aggregatePositionEvents } from "@/lib/subgraph-utils";
 
 /**
@@ -27,13 +27,21 @@ function parsePositionId(tokenId: string): {
   };
 }
 
+export interface PositionWithEvents extends Position {
+  mints: SubgraphMint[];
+  burns: SubgraphBurn[];
+  collects: SubgraphCollect[];
+}
+
 export function usePositionDetails(tokenId: string) {
-  const [position, setPosition] = useState<Position | null>(null);
+  const [position, setPosition] = useState<PositionWithEvents | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [events, setEvents] = useState<SubgraphPositionByTicksResponse | null>(null);
 
   useEffect(() => {
     if (!tokenId) {
       setPosition(null);
+      setEvents(null);
       setIsLoading(false);
       return;
     }
@@ -47,6 +55,7 @@ export function usePositionDetails(tokenId: string) {
         if (!positionParts) {
           console.warn("Invalid position ID format:", tokenId);
           setPosition(null);
+          setEvents(null);
           setIsLoading(false);
           return;
         }
@@ -63,6 +72,8 @@ export function usePositionDetails(tokenId: string) {
             }
           );
 
+          setEvents(response);
+
           if (response.mints || response.burns || response.collects) {
             // Aggregate events into positions
             const positions = aggregatePositionEvents(
@@ -74,7 +85,14 @@ export function usePositionDetails(tokenId: string) {
             // Find the matching position
             const positionData = positions.find((p) => p.tokenId === tokenId);
             if (positionData) {
-              setPosition(positionData);
+              // Enhance position with event arrays
+              const positionWithEvents: PositionWithEvents = {
+                ...positionData,
+                mints: response.mints || [],
+                burns: response.burns || [],
+                collects: response.collects || [],
+              };
+              setPosition(positionWithEvents);
               setIsLoading(false);
               return;
             }
@@ -99,5 +117,5 @@ export function usePositionDetails(tokenId: string) {
     fetchPosition();
   }, [tokenId]);
 
-  return { position, isLoading };
+  return { position, isLoading, events };
 }
