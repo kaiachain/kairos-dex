@@ -15,7 +15,13 @@ interface PriceInfoProps {
 export function PriceInfo({ quote, tokenIn, tokenOut, slippage }: PriceInfoProps) {
   const priceImpact = quote.priceImpact || 0;
   const minAmountOut = quote.amountOut
-    ? (parseFloat(quote.amountOut) * (1 - slippage / 100)).toFixed(6)
+    ? (() => {
+        const amount = parseFloat(quote.amountOut) * (1 - slippage / 100);
+        // Use scientific notation for very small numbers
+        return amount < 0.000001 && amount > 0
+          ? amount.toExponential(4)
+          : amount.toFixed(6);
+      })()
     : '0';
 
   return (
@@ -23,7 +29,13 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage }: PriceInfoProps
       <div className="flex items-center justify-between">
         <span className="text-gray-600 dark:text-gray-400">Price</span>
         <span className="font-medium">
-          1 {tokenIn.symbol} = {formatNumber(quote.price || 0, 6)} {tokenOut.symbol}
+          1 {tokenIn.symbol} ={' '}
+          {quote.price && quote.price > 0
+            ? quote.price < 0.000001
+              ? quote.price.toExponential(4)
+              : formatNumber(quote.price, 6)
+            : '0.000000'}{' '}
+          {tokenOut.symbol}
         </span>
       </div>
 
