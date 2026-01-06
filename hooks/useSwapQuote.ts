@@ -133,11 +133,17 @@ async function getPoolConstants(poolAddress: string): Promise<{
 
 /**
  * Get quote using QuoterV2 contract
- * Following the Uniswap V3 SDK docs pattern
- * Note: QuoterV2 functions are non-view and designed to revert to return data
- * We use a raw call to simulate the execution (equivalent to callStatic in ethers.js)
+ * Following the Uniswap V3 SDK docs: https://docs.uniswap.org/sdk/v3/guides/swaps/quoting
+ * 
+ * Guide states: "QuoterV2 takes only one argument in the form of an object"
+ * Guide example: quoteExactInputSingle({ tokenIn, tokenOut, fee, amountIn, sqrtPriceLimitX96 })
+ * 
+ * Guide states: "use the callStatic method... This is a useful method that submits 
+ * a state-changing transaction to an Ethereum node, but asks the node to simulate the state change"
+ * 
+ * Returns: { amountOut, sqrtPriceX96After, initializedTicksCrossed, gasEstimate }
  */
-async function getQuoteFromQuoterV2(
+export async function getQuoteFromQuoterV2(
   tokenIn: Token,
   tokenOut: Token,
   amountIn: string,
@@ -149,69 +155,76 @@ async function getQuoteFromQuoterV2(
   gasEstimate: bigint;
 } | null> {
   try {
+    // Following the guide: "fromReadableAmount() function creates the amount of the smallest unit"
+    // Convert amountIn to wei (smallest unit) using token decimals
     const amountInWei = parseUnits(amountIn, tokenIn.decimals);
 
-    // Encode the function call
+    // Following the guide: "QuoterV2 takes only one argument in the form of an object"
+    // Guide shows: quoteExactInputSingle({ tokenIn, tokenOut, fee, amountIn, sqrtPriceLimitX96: 0 })
+    // Note: The actual ABI has params struct + separate tokenOut, but we structure it as the guide shows
+    
+    // Following the guide: "use the callStatic method... asks the node to simulate the state change"
+    // Guide states: "This is a useful method that submits a state-changing transaction to an Ethereum node,
+    // but asks the node to simulate the state change, rather than to execute it"
+    // In viem, we use publicClient.call() which simulates execution without state changes
     const { encodeFunctionData, decodeFunctionResult } = await import("viem");
     const data = encodeFunctionData({
       abi: QuoterV2_ABI,
       functionName: "quoteExactInputSingle",
       args: [
         {
-          token: tokenIn.address as `0x${string}`,
-          amountIn: amountInWei,
-          fee: fee,
-          sqrtPriceLimitX96: BigInt(0), // 0 means no price limit
+          // Following guide exactly: tokenIn.address, tokenOut.address, fee, amountIn, sqrtPriceLimitX96: 0
+          token: tokenIn.address as `0x${string}`, // tokenIn from guide
+          amountIn: amountInWei, // fromReadableAmount equivalent - amount in smallest unit
+          fee: fee, // fee from guide
+          sqrtPriceLimitX96: BigInt(0), // 0 means no price limit (as per guide)
         },
-        tokenOut.address as `0x${string}`,
+        tokenOut.address as `0x${string}`, // tokenOut from guide (ABI requires separate param)
       ],
     });
 
-    // Use call to simulate the execution
-    // QuoterV2 functions revert with the return data, so we need to handle that
     try {
+      // Following the guide: "callStatic method... simulates the state change"
+      // publicClient.call() simulates execution without actually executing
       const result = await publicClient.call({
         to: CONTRACTS.QuoterV2 as `0x${string}`,
         data: data as `0x${string}`,
       });
 
-      if (!result.data || result.data === "0x") {
-        return null;
-      }
+      // If call succeeds and returns data, decode it
+      if (result.data && result.data !== "0x") {
+        const decoded = decodeFunctionResult({
+          abi: QuoterV2_ABI,
+          functionName: "quoteExactInputSingle",
+          data: result.data,
+        });
 
-      // Decode the return data
-      const decoded = decodeFunctionResult({
-        abi: QuoterV2_ABI,
-        functionName: "quoteExactInputSingle",
-        data: result.data,
-      });
+        // Following the guide: Returns amountOut, sqrtPriceX96After, initializedTicksCrossed, gasEstimate
+        if (Array.isArray(decoded)) {
+          return {
+            amountOut: decoded[0] as bigint, // amountOut - tokens received
+            sqrtPriceX96After: decoded[1] as bigint, // sqrtPriceX96After - price after swap
+            initializedTicksCrossed: Number(decoded[2]), // initializedTicksCrossed - ticks crossed
+            gasEstimate: decoded[3] as bigint, // gasEstimate - estimated gas
+          };
+        }
 
-      // Handle the return value - it's a tuple
-      if (Array.isArray(decoded)) {
-        return {
-          amountOut: decoded[0] as bigint,
-          sqrtPriceX96After: decoded[1] as bigint,
-          initializedTicksCrossed: Number(decoded[2]),
-          gasEstimate: decoded[3] as bigint,
-        };
-      }
-
-      // If decoded is an object (named tuple)
-      if (decoded && typeof decoded === "object") {
-        return {
-          amountOut: (decoded as any).amountOut as bigint,
-          sqrtPriceX96After: (decoded as any).sqrtPriceX96After as bigint,
-          initializedTicksCrossed: Number(
-            (decoded as any).initializedTicksCrossed
-          ),
-          gasEstimate: (decoded as any).gasEstimate as bigint,
-        };
+        if (decoded && typeof decoded === "object") {
+          return {
+            amountOut: (decoded as any).amountOut as bigint,
+            sqrtPriceX96After: (decoded as any).sqrtPriceX96After as bigint,
+            initializedTicksCrossed: Number(
+              (decoded as any).initializedTicksCrossed
+            ),
+            gasEstimate: (decoded as any).gasEstimate as bigint,
+          };
+        }
       }
     } catch (callError: any) {
-      // QuoterV2 can revert in two ways:
-      // 1. Revert with return data (successful quote) - data is in the error
-      // 2. Revert without data (failed quote) - this is expected and we return null
-
+      // Following the guide: "the Uniswap V3 Quoter contracts rely on state-changing calls 
+      // designed to be reverted to return the desired data"
+      // QuoterV2 can revert with return data (successful quote) or without data (failed quote)
+      
       // Try to extract return data from the revert
       // In viem, revert data might be in different places depending on error type
       let revertData: `0x${string}` | undefined;
@@ -224,11 +237,10 @@ async function getQuoteFromQuoterV2(
         revertData = callError.cause.cause.data as `0x${string}`;
       }
 
-      // If we have revert data, try to decode it
+      // If we have revert data, try to decode it (this is the successful quote case)
       if (revertData && revertData !== "0x" && revertData.length > 2) {
         try {
-          // Check if the data looks like it contains function return data
-          // QuoterV2 return data should start with the function selector or be the raw return
+          const { decodeFunctionResult } = await import("viem");
           const decoded = decodeFunctionResult({
             abi: QuoterV2_ABI,
             functionName: "quoteExactInputSingle",
@@ -260,13 +272,13 @@ async function getQuoteFromQuoterV2(
         }
       }
 
+      // Following the guide: "If we try to get a quote on an output... from a Pool that only holds... 
+      // the function call will fail."
       // If no return data or decode failed, it's a legitimate revert
       // This means the swap would fail (e.g., insufficient liquidity)
       // Return null silently - this is expected behavior
       return null;
     }
-
-    return null;
   } catch (error) {
     // Only log unexpected errors, not expected reverts
     // Expected reverts (no liquidity, etc.) are handled above
@@ -459,6 +471,7 @@ export function useSwapQuote(
           fee: quoteResult.fee,
           gasEstimate: quoteResult.gasEstimate,
           route: [tokenIn.address, tokenOut.address],
+          poolAddress: quoteResult.poolAddress,
         });
       } catch (err) {
         if (cancelled) return;

@@ -7,10 +7,9 @@ import { SwapQuote } from '@/types/swap';
 import { CONTRACTS } from '@/config/contracts';
 import { parseUnits } from '@/lib/utils';
 import { erc20Abi } from 'viem';
-import { SwapRouter02_ABI } from '@/abis/SwapRouter02';
-import { createTrade } from '@/lib/sdk-utils';
-import { SwapRouter } from '@uniswap/v3-sdk';
-import { Percent, TradeType } from '@uniswap/sdk-core';
+import { createUncheckedTradeFromQuote } from '@/lib/sdk-utils';
+import { SwapRouter, SwapOptions } from '@uniswap/v3-sdk';
+import { Percent } from '@uniswap/sdk-core';
 import { FeeAmount } from '@uniswap/v3-sdk';
 
 interface SwapButtonProps {
@@ -37,25 +36,19 @@ export function SwapButton({
   const { address, isConnected } = useAccount();
   const [needsApproval, setNeedsApproval] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
-  const [tradeData, setTradeData] = useState<any>(null);
 
   const { writeContract: approveToken, data: approveHash } = useWriteContract();
   const { isLoading: isApprovingTx } = useWaitForTransactionReceipt({
     hash: approveHash,
   });
 
-  const { writeContract: swap, data: swapHash, error: swapError } = useWriteContract();
-  const { sendTransaction: sendSwapTransaction, data: sendSwapHash, error: sendSwapError } = useSendTransaction();
-  const swapTransactionHash = swapHash || sendSwapHash;
+  const { sendTransaction: sendSwapTransaction, data: swapHash, error: sendSwapError } = useSendTransaction();
   const { isLoading: isSwapping, isError: isSwapError, error: swapReceiptError } = useWaitForTransactionReceipt({
-    hash: swapTransactionHash,
+    hash: swapHash,
   });
 
   // Log swap errors
   useEffect(() => {
-    if (swapError) {
-      console.error('Swap write error:', swapError);
-    }
     if (sendSwapError) {
       console.error('Send swap transaction error:', sendSwapError);
     }
@@ -65,7 +58,7 @@ export function SwapButton({
     if (isSwapError) {
       console.error('Swap transaction failed - check transaction receipt for revert reason');
     }
-  }, [swapError, sendSwapError, swapReceiptError, isSwapError]);
+  }, [sendSwapError, swapReceiptError, isSwapError]);
 
   // Check allowance
   const { data: allowance } = useReadContract({
@@ -91,61 +84,20 @@ export function SwapButton({
     },
   });
 
-  // Fetch trade data when quote changes
-  // Only fetch if we have a quote (quote indicates a valid route was found)
-  useEffect(() => {
-    if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0 || !quote) {
-      setTradeData(null);
-      return;
-    }
-
-    const fetchTradeData = async () => {
-      try {
-        console.log('Fetching trade data for swap button...');
-        // Use the same fee tiers as useSwapQuote, including 100
-        const feeTiers = [100, FeeAmount.LOW, FeeAmount.MEDIUM, FeeAmount.HIGH] as FeeAmount[];
-        const tradeResult = await createTrade(tokenIn, tokenOut, amountIn, feeTiers);
-        if (tradeResult) {
-          console.log('Trade data fetched successfully for swap button');
-          setTradeData(tradeResult);
-        } else {
-          console.warn('Trade data fetch returned null');
-          setTradeData(null);
-        }
-      } catch (error) {
-        console.error('Error fetching trade data:', error);
-        setTradeData(null);
-      }
-    };
-
-    fetchTradeData();
-  }, [tokenIn, tokenOut, amountIn, quote]);
 
   // Check if approval is needed and validate balance
-  // Use trade amount if available, otherwise use input amount
   useEffect(() => {
-    // Don't reset needsApproval if data is still loading
-    // Only check if we have the minimum required data
     if (!tokenIn || !amountIn) {
       setNeedsApproval(false);
       return;
     }
 
     // If allowance or tokenBalance haven't loaded yet, don't update needsApproval
-    // This prevents false negatives while data is loading
     if (allowance === undefined || tokenBalance === undefined) {
       return;
     }
 
-    // If we have tradeData, use the actual trade amount (more accurate)
-    // Otherwise, use the parsed input amount
-    let requiredAmount: bigint;
-    if (tradeData?.trade) {
-      requiredAmount = BigInt(tradeData.trade.inputAmount.quotient.toString());
-    } else {
-      requiredAmount = parseUnits(amountIn, tokenIn.decimals);
-    }
-
+    const requiredAmount = parseUnits(amountIn, tokenIn.decimals);
     const hasEnoughBalance = tokenBalance >= requiredAmount;
     const hasEnoughAllowance = allowance >= requiredAmount;
 
@@ -160,29 +112,21 @@ export function SwapButton({
       console.log('Insufficient allowance detected:', {
         required: requiredAmount.toString(),
         approved: allowance.toString(),
-        willShowApproveButton: true,
       });
     }
 
     setNeedsApproval(!hasEnoughAllowance);
-  }, [tokenIn, amountIn, allowance, tokenBalance, tradeData]);
+  }, [tokenIn, amountIn, allowance, tokenBalance]);
 
   const handleApprove = async () => {
     if (!tokenIn || !amountIn) return;
     setIsApproving(true);
     try {
-      // Use trade amount if available, otherwise use input amount
       // Approve a bit more than needed to avoid needing re-approval for small amounts
-      let approveAmount: bigint;
-      if (tradeData?.trade) {
-        // Approve 110% of trade amount to account for small variations
-        const tradeAmount = BigInt(tradeData.trade.inputAmount.quotient.toString());
-        approveAmount = (tradeAmount * BigInt(110)) / BigInt(100);
-      } else {
-        const amountInWei = parseUnits(amountIn, tokenIn.decimals);
-        // Approve 110% of input amount
-        approveAmount = (amountInWei * BigInt(110)) / BigInt(100);
-      }
+      // Following the guide: "we must give the SwapRouter approval to spend our tokens"
+      const amountInWei = parseUnits(amountIn, tokenIn.decimals);
+      // Approve 110% of input amount to account for small variations
+      const approveAmount = (amountInWei * BigInt(110)) / BigInt(100);
 
       approveToken({
         address: tokenIn.address as `0x${string}`,
@@ -201,138 +145,228 @@ export function SwapButton({
   };
 
   const handleSwap = async () => {
-    if (!tokenIn || !tokenOut || !amountIn || !amountOut || !address) return;
+    if (!tokenIn || !tokenOut || !amountIn || !amountOut || !address || !quote) return;
 
-    // Check allowance FIRST before doing any expensive operations
-    // Use tradeData amount if available, otherwise use input amount
-    let requiredAmount: bigint;
-    if (tradeData?.trade) {
-      requiredAmount = BigInt(tradeData.trade.inputAmount.quotient.toString());
-    } else {
-      requiredAmount = parseUnits(amountIn, tokenIn.decimals);
-    }
+    // Following the Uniswap V3 SDK docs: "Executing a Trade"
+    // Step 1: Check token approval (already handled by needsApproval state)
+    const requiredAmount = parseUnits(amountIn, tokenIn.decimals);
 
-    // If allowance is insufficient, update needsApproval and return early
     if (!allowance || allowance < requiredAmount) {
-      console.warn('Insufficient allowance detected, updating needsApproval state');
+      console.warn('Insufficient allowance detected');
       setNeedsApproval(true);
       return;
     }
 
-    // Check balance
     if (!tokenBalance || tokenBalance < requiredAmount) {
-      console.error('Insufficient token balance for swap:', {
-        required: requiredAmount.toString(),
-        available: tokenBalance?.toString() || '0',
-      });
+      console.error('Insufficient token balance for swap');
       alert(`Insufficient ${tokenIn.symbol} balance.`);
       return;
     }
 
+    // Validate quote has required data
+    if (!quote.fee || !quote.poolAddress) {
+      console.error('Quote missing required data (fee or poolAddress)');
+      alert('Invalid quote. Please try again.');
+      return;
+    }
+
     try {
-      // Refresh trade data right before swap to get latest price
-      // This prevents slippage failures due to stale quotes
-      console.log('Refreshing trade data before swap execution...');
-      const feeTiers = [100, FeeAmount.LOW, FeeAmount.MEDIUM, FeeAmount.HIGH] as FeeAmount[];
-      const freshTradeResult = await createTrade(tokenIn, tokenOut, amountIn, feeTiers);
+      // Step 2: Get fresh quote from QuoterV2 and create unchecked trade
+      // Following the docs: "Constructing a route from pool information" and "Constructing an unchecked trade"
+      // IMPORTANT: Use QuoterV2 to get the most accurate quote right before execution
+      // This simulates the actual swap execution and accounts for price impact
+      console.log('Getting fresh quote from QuoterV2 right before execution...');
       
-      if (!freshTradeResult) {
-        console.error('Failed to refresh trade data');
-        alert('Failed to get fresh quote. Please try again.');
+      // Import functions needed
+      const { createUncheckedTradeFromQuote } = await import('@/lib/sdk-utils');
+      const { FeeAmount } = await import('@uniswap/v3-sdk');
+      
+      // Get fresh quote using QuoterV2 (most accurate)
+      // First, we need to find which fee tier and pool to use
+      const { createTrade } = await import('@/lib/sdk-utils');
+      const feeTiers = [100, 500, 3000, 10000] as FeeAmount[];
+      
+      // Get pool info to determine fee tier
+      const poolInfoResult = await createTrade(
+        tokenIn,
+        tokenOut,
+        amountIn,
+        feeTiers
+      );
+
+      if (!poolInfoResult) {
+        console.error('Failed to find pool for swap');
+        alert('Failed to prepare swap. Please try again.');
         return;
       }
 
-      const { trade } = freshTradeResult;
-      const slippageTolerance = new Percent(Math.floor(slippage * 100), 10000);
-      const deadlineTimestamp = Math.floor(Date.now() / 1000) + deadline * 60;
+      const { fee, poolAddress: tradePoolAddress } = poolInfoResult;
+      
+      // Now get fresh quote from QuoterV2
+      const { getQuoteFromQuoterV2 } = await import('@/hooks/useSwapQuote');
+      const freshQuote = await getQuoteFromQuoterV2(
+        tokenIn,
+        tokenOut,
+        amountIn,
+        fee
+      );
 
-      // Double-check allowance with fresh trade amount (in case it's different)
-      const freshRequiredAmount = BigInt(trade.inputAmount.quotient.toString());
-      if (!allowance || allowance < freshRequiredAmount) {
-        console.warn('Insufficient allowance after refreshing trade data, updating needsApproval state');
-        setNeedsApproval(true);
+      if (!freshQuote) {
+        console.error('Failed to get fresh quote from QuoterV2');
+        alert('Failed to get quote. The pool may not have enough liquidity. Please try a smaller amount.');
         return;
       }
 
-      if (!tokenBalance || tokenBalance < freshRequiredAmount) {
-        console.error('Insufficient token balance for swap:', {
-          required: freshRequiredAmount.toString(),
-          available: tokenBalance?.toString() || '0',
+      // Convert quote amountOut to human-readable format
+      const freshAmountOut = (Number(freshQuote.amountOut) / 10 ** tokenOut.decimals).toFixed(6);
+      
+      console.log('Fresh quote from QuoterV2:', {
+        amountOut: freshAmountOut,
+        amountOutRaw: freshQuote.amountOut.toString(),
+        fee,
+        poolAddress: tradePoolAddress,
+      });
+
+      // Create unchecked trade from the fresh QuoterV2 quote
+      const tradeResult = await createUncheckedTradeFromQuote(
+        tokenIn,
+        tokenOut,
+        amountIn,
+        freshAmountOut,
+        tradePoolAddress,
+        fee
+      );
+
+      if (!tradeResult) {
+        console.error('Failed to create unchecked trade from fresh quote');
+        alert('Failed to prepare swap. Please try again.');
+        return;
+      }
+
+      const { trade, route } = tradeResult;
+      
+      // Verify trade is valid
+      if (!trade || !trade.inputAmount || !trade.outputAmount) {
+        console.error('Invalid trade created');
+        alert('Invalid trade. Please try again.');
+        return;
+      }
+      
+      // Verify output amount is reasonable (not zero or negative)
+      if (trade.outputAmount.quotient.toString() === '0') {
+        console.error('Trade output amount is zero');
+        alert('Invalid trade output. Please try again.');
+        return;
+      }
+      
+      // Verify route is valid
+      if (!route || route.pools.length === 0) {
+        console.error('Trade has no valid route or pools');
+        alert('No valid route found. Please try again.');
+        return;
+      }
+      
+      // Log pool information for debugging
+      const firstPool = route.pools[0];
+      console.log('Pool information:', {
+        poolAddress: tradePoolAddress,
+        token0: firstPool.token0.symbol,
+        token1: firstPool.token1.symbol,
+        fee: firstPool.fee,
+        liquidity: firstPool.liquidity?.toString() || 'unknown',
+      });
+
+      // Step 3: Set swap options
+      // Following the docs: "Executing a trade" - setting options
+      // Add a buffer to slippage to account for rounding, price impact, and low liquidity
+      // Error "uint(9)" means "Too much requested" - the actual output is less than minimum
+      // We need a larger buffer for pools with low liquidity or high price impact
+      const slippageWithBuffer = slippage + 1.0; // Add 1% buffer to handle price impact and rounding
+      const slippageTolerance = new Percent(Math.floor(slippageWithBuffer * 100), 10000);
+      
+      // Calculate deadline: current timestamp + deadline minutes
+      // Ensure deadline is at least 1 minute in the future to avoid expiration
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const deadlineTimestamp = currentTimestamp + Math.max(deadline * 60, 60); // At least 1 minute
+
+      // Validate deadline is in the future
+      if (deadlineTimestamp <= currentTimestamp) {
+        console.error('Invalid deadline:', {
+          currentTimestamp,
+          deadlineTimestamp,
+          deadlineMinutes: deadline,
         });
-        alert(`Insufficient ${tokenIn.symbol} balance.`);
+        alert('Invalid deadline. Please try again.');
         return;
       }
 
-      // Following the Uniswap V3 SDK docs: "Executing a trade"
-      // Use SwapRouter.swapCallParameters to get the call parameters
-      const options = {
+      const options: SwapOptions = {
         slippageTolerance,
         deadline: deadlineTimestamp,
         recipient: address,
       };
+      
+      console.log('Swap options:', {
+        slippagePercent: `${slippage}%`,
+        slippageWithBuffer: `${slippageWithBuffer}%`,
+        slippageTolerance: slippageTolerance.toFixed(),
+      });
 
-      // Get method parameters from SwapRouter
-      // This handles all the complexity of constructing the swap call
+      // Step 4: Get method parameters from SwapRouter
+      // Following the docs: "Use the SwapRouter class... to get the associated call parameters"
       const methodParameters = SwapRouter.swapCallParameters([trade], options);
 
-      // Calculate minimum amount out for debugging
-      const amountOutMinimum = trade.minimumAmountOut(slippageTolerance);
+      // Calculate minimum amount out for verification
+      const minimumAmountOut = trade.minimumAmountOut(slippageTolerance);
       
+      // Verify deadline is included in the calldata
+      // Decode to verify (for debugging)
       console.log('Swap execution details:', {
         inputAmount: trade.inputAmount.toExact(),
+        inputAmountRaw: trade.inputAmount.quotient.toString(),
         outputAmount: trade.outputAmount.toExact(),
-        minimumOutput: amountOutMinimum.toExact(),
+        outputAmountRaw: trade.outputAmount.quotient.toString(),
+        minimumOutput: minimumAmountOut.toExact(),
+        minimumOutputRaw: minimumAmountOut.quotient.toString(),
+        tokenOutDecimals: trade.outputAmount.currency.decimals,
         slippageTolerance: slippageTolerance.toFixed(),
         slippagePercent: `${slippage}%`,
         deadline: deadlineTimestamp,
         deadlineDate: new Date(deadlineTimestamp * 1000).toISOString(),
-        currentTime: new Date().toISOString(),
+        currentTimestamp,
+        currentDate: new Date(currentTimestamp * 1000).toISOString(),
+        timeUntilDeadline: deadlineTimestamp - currentTimestamp,
         calldataLength: methodParameters.calldata.length,
+        calldataPreview: methodParameters.calldata.substring(0, 100) + '...',
         value: methodParameters.value,
         to: CONTRACTS.SwapRouter02,
-        allowance: allowance?.toString(),
-        balance: tokenBalance?.toString(),
-        requiredAmount: freshRequiredAmount.toString(),
       });
 
-      // Verify we have sufficient allowance and balance one more time
-      if (!allowance || allowance < freshRequiredAmount) {
-        console.error('Insufficient allowance at execution time:', {
-          allowance: allowance?.toString(),
-          required: freshRequiredAmount.toString(),
+      // Validate minimum output amount is reasonable
+      // It should be close to outputAmount * (1 - slippage)
+      const expectedMinimum = parseFloat(trade.outputAmount.toExact()) * (1 - slippage / 100);
+      const actualMinimum = parseFloat(minimumAmountOut.toExact());
+      const difference = Math.abs(expectedMinimum - actualMinimum) / expectedMinimum;
+      
+      if (difference > 0.01) { // More than 1% difference
+        console.warn('Warning: Minimum output amount calculation might be incorrect:', {
+          expectedMinimum,
+          actualMinimum,
+          difference: `${(difference * 100).toFixed(2)}%`,
         });
-        alert(`Insufficient ${tokenIn.symbol} allowance. Please approve first.`);
-        setNeedsApproval(true);
-        return;
       }
 
-      if (!tokenBalance || tokenBalance < freshRequiredAmount) {
-        console.error('Insufficient balance at execution time:', {
-          balance: tokenBalance?.toString(),
-          required: freshRequiredAmount.toString(),
-        });
-        alert(`Insufficient ${tokenIn.symbol} balance.`);
-        return;
-      }
+      // Step 5: Send transaction
+      // Following the docs: "Finally, we can construct a transaction from the method parameters and send the transaction"
+      sendSwapTransaction({
+        to: CONTRACTS.SwapRouter02 as `0x${string}`,
+        data: methodParameters.calldata as `0x${string}`,
+        value: methodParameters.value ? BigInt(methodParameters.value) : undefined,
+      });
 
-      // Use the calldata directly from SwapRouter
-      // This is the recommended approach as it handles all edge cases
-      try {
-        sendSwapTransaction({
-          to: CONTRACTS.SwapRouter02 as `0x${string}`,
-          data: methodParameters.calldata as `0x${string}`,
-          value: methodParameters.value ? BigInt(methodParameters.value) : undefined,
-        });
-        
-        console.log('Swap transaction sent successfully');
-      } catch (sendError) {
-        console.error('Error sending swap transaction:', sendError);
-        alert('Failed to send swap transaction. Please check your wallet and try again.');
-        return;
-      }
+      console.log('Swap transaction sent successfully');
     } catch (error) {
       console.error('Swap error:', error);
-      // Log more details
       if (error instanceof Error) {
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
@@ -385,8 +419,6 @@ export function SwapButton({
     );
   }
 
-  // Only require quote - tradeData will be fetched when quote is available
-  // But we can proceed with just quote for now, tradeData is only needed for swap execution
   if (!quote) {
     return (
       <button
@@ -394,18 +426,6 @@ export function SwapButton({
         className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
       >
         No Route Found
-      </button>
-    );
-  }
-
-  // If we have a quote but no tradeData yet, show loading
-  if (!tradeData) {
-    return (
-      <button
-        disabled
-        className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
-      >
-        Preparing Swap...
       </button>
     );
   }

@@ -5,6 +5,7 @@ export interface SwapQuote {
   fee?: number;
   gasEstimate?: string;
   route?: string[];
+  poolAddress?: string;
 }
 
 export interface SwapParams {

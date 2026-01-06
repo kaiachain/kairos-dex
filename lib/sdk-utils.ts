@@ -320,6 +320,210 @@ async function ensureTokenDecimals(token: AppToken): Promise<AppToken> {
 }
 
 /**
+ * Get pool information (token0, token1, fee, liquidity, sqrtPriceX96, tick)
+ * Following the Uniswap V3 SDK docs: "Constructing a route from pool information"
+ */
+export async function getPoolInfo(poolAddress: string): Promise<{
+  token0: string;
+  token1: string;
+  fee: number;
+  liquidity: bigint;
+  sqrtPriceX96: bigint;
+  tick: number;
+} | null> {
+  try {
+    const [token0, token1, fee, liquidity, slot0] = await Promise.all([
+      publicClient.readContract({
+        address: poolAddress as `0x${string}`,
+        abi: Pool_ABI,
+        functionName: 'token0',
+      }),
+      publicClient.readContract({
+        address: poolAddress as `0x${string}`,
+        abi: Pool_ABI,
+        functionName: 'token1',
+      }),
+      publicClient.readContract({
+        address: poolAddress as `0x${string}`,
+        abi: Pool_ABI,
+        functionName: 'fee',
+      }),
+      publicClient.readContract({
+        address: poolAddress as `0x${string}`,
+        abi: Pool_ABI,
+        functionName: 'liquidity',
+      }),
+      publicClient.readContract({
+        address: poolAddress as `0x${string}`,
+        abi: Pool_ABI,
+        functionName: 'slot0',
+      }),
+    ]);
+
+    // Handle slot0 as either array (tuple) or object
+    let sqrtPriceX96: bigint;
+    let tick: number;
+    
+    if (Array.isArray(slot0)) {
+      sqrtPriceX96 = slot0[0] as bigint;
+      tick = Number(slot0[1]);
+    } else if (slot0 && typeof slot0 === 'object') {
+      sqrtPriceX96 = (slot0 as any).sqrtPriceX96 as bigint;
+      tick = Number((slot0 as any).tick);
+    } else {
+      throw new Error('Unexpected slot0 return format');
+    }
+
+    return {
+      token0: token0 as string,
+      token1: token1 as string,
+      fee: Number(fee),
+      liquidity: liquidity as bigint,
+      sqrtPriceX96,
+      tick,
+    };
+  } catch (error) {
+    console.error('Error getting pool info:', error);
+    return null;
+  }
+}
+
+/**
+ * Construct route and unchecked trade from quote
+ * Following the Uniswap V3 SDK docs: "Executing a Trade"
+ * This function implements steps 1-2 from the guide:
+ * 1. Constructing a route from pool information
+ * 2. Constructing an unchecked trade
+ */
+export async function createUncheckedTradeFromQuote(
+  tokenIn: AppToken,
+  tokenOut: AppToken,
+  amountIn: string,
+  amountOut: string,
+  poolAddress: string,
+  fee: FeeAmount
+): Promise<{
+  trade: Trade<Token, Token, TradeType.EXACT_INPUT>;
+  route: Route<Token, Token>;
+} | null> {
+  if (!amountIn || parseFloat(amountIn) <= 0 || !amountOut || parseFloat(amountOut) <= 0) {
+    return null;
+  }
+
+  // Ensure tokens have correct decimals
+  const tokenInWithDecimals = await ensureTokenDecimals(tokenIn);
+  const tokenOutWithDecimals = await ensureTokenDecimals(tokenOut);
+
+  const sdkTokenIn = tokenToSDKToken(tokenInWithDecimals);
+  const sdkTokenOut = tokenToSDKToken(tokenOutWithDecimals);
+
+  // Step 1: Get pool information
+  // Following the docs: "Constructing a route from pool information"
+  const poolInfo = await getPoolInfo(poolAddress);
+  if (!poolInfo) {
+    console.error('Failed to get pool info');
+    return null;
+  }
+
+  // Get token0 and token1 from pool to ensure correct ordering
+  // The pool contract stores tokens in the correct order (token0 < token1)
+  const poolToken0Address = getAddress(poolInfo.token0);
+  const poolToken1Address = getAddress(poolInfo.token1);
+  
+  // Determine which token is token0 and which is token1
+  const tokenInAddress = getAddress(sdkTokenIn.address);
+  const tokenOutAddress = getAddress(sdkTokenOut.address);
+  
+  // Map our tokens to pool's token0/token1 order
+  const token0 = tokenInAddress.toLowerCase() === poolToken0Address.toLowerCase() 
+    ? sdkTokenIn 
+    : tokenOutAddress.toLowerCase() === poolToken0Address.toLowerCase() 
+    ? sdkTokenOut 
+    : sdkTokenIn; // fallback (shouldn't happen if pool is correct)
+    
+  const token1 = tokenInAddress.toLowerCase() === poolToken1Address.toLowerCase() 
+    ? sdkTokenIn 
+    : tokenOutAddress.toLowerCase() === poolToken1Address.toLowerCase() 
+    ? sdkTokenOut 
+    : sdkTokenOut; // fallback
+
+  // Construct Pool instance with tokens in correct order
+  const tickDataProvider = new BlockchainTickDataProvider(poolAddress);
+  const pool = new Pool(
+    token0,
+    token1,
+    fee,
+    poolInfo.sqrtPriceX96.toString(),
+    poolInfo.liquidity.toString(),
+    poolInfo.tick,
+    tickDataProvider
+  );
+
+  // Create route from pool
+  // Following the docs: "Creating a Route"
+  // Route uses input/output tokens, not necessarily token0/token1
+  // The Route constructor handles token ordering automatically
+  const route = new Route([pool], sdkTokenIn, sdkTokenOut);
+  
+  // Verify route is valid
+  if (route.pools.length === 0) {
+    console.error('Failed to create route - no pools');
+    return null;
+  }
+  
+  console.log('Route created:', {
+    input: route.input.address,
+    output: route.output.address,
+    pools: route.pools.length,
+    midPrice: route.midPrice.toFixed(),
+  });
+
+  // Step 2: Construct unchecked trade
+  // Following the docs: "Constructing an unchecked trade"
+  // We use the quote's amountOut since we already have it from the Quoter
+  const amountInWei = parseFloat(amountIn) * 10 ** tokenInWithDecimals.decimals;
+  const amountOutWei = parseFloat(amountOut) * 10 ** tokenOutWithDecimals.decimals;
+
+  // Use BigInt for precise calculations to avoid floating point errors
+  const amountInWeiBigInt = BigInt(Math.floor(amountInWei));
+  const amountOutWeiBigInt = BigInt(Math.floor(amountOutWei));
+
+  const inputAmount = CurrencyAmount.fromRawAmount(
+    sdkTokenIn,
+    amountInWeiBigInt.toString()
+  );
+
+  const outputAmount = CurrencyAmount.fromRawAmount(
+    sdkTokenOut,
+    amountOutWeiBigInt.toString()
+  );
+
+  // Use Trade.createUncheckedTrade as shown in the guide
+  const trade = Trade.createUncheckedTrade({
+    route,
+    inputAmount,
+    outputAmount,
+    tradeType: TradeType.EXACT_INPUT,
+  });
+
+  console.log('Unchecked trade created from quote:', {
+    inputAmount: trade.inputAmount.toExact(),
+    inputAmountRaw: trade.inputAmount.quotient.toString(),
+    outputAmount: trade.outputAmount.toExact(),
+    outputAmountRaw: trade.outputAmount.quotient.toString(),
+    tokenInDecimals: tokenInWithDecimals.decimals,
+    tokenOutDecimals: tokenOutWithDecimals.decimals,
+    sdkTokenInDecimals: sdkTokenIn.decimals,
+    sdkTokenOutDecimals: sdkTokenOut.decimals,
+  });
+
+  return {
+    trade,
+    route,
+  };
+}
+
+/**
  * Create a trade using the SDK
  * Following the Uniswap V3 SDK docs pattern for constructing trades
  */
