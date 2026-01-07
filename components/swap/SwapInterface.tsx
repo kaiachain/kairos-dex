@@ -6,7 +6,7 @@ import { TokenSelector } from './TokenSelector';
 import { SwapButton } from './SwapButton';
 import { SwapSettings } from './SwapSettings';
 import { PriceInfo } from './PriceInfo';
-import { ArrowDownUp } from 'lucide-react';
+import { ArrowDownUp, Loader2 } from 'lucide-react';
 import { Token } from '@/types/token';
 import { useSwapQuote } from '@/hooks/useSwapQuote';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
@@ -104,21 +104,32 @@ export function SwapInterface() {
         <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm text-gray-600 dark:text-gray-400">To</label>
-            {quote?.amountOut && (
+            {isQuoteLoading ? (
+              <span className="text-xs text-gray-500 dark:text-gray-500 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Fetching quote...
+              </span>
+            ) : quote?.amountOut ? (
               <span className="text-xs text-gray-600 dark:text-gray-400">
                 ≈ {quote.amountOut}
               </span>
-            )}
+            ) : null}
           </div>
           <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <input
-                type="text"
-                value={quote?.amountOut || ''}
-                placeholder="0.0"
-                readOnly
-                className="w-full text-2xl font-semibold bg-transparent border-none outline-none text-gray-400"
-              />
+            <div className="flex-1 relative">
+              {isQuoteLoading && tokenIn && tokenOut && amountIn && parseFloat(amountIn) > 0 ? (
+                <div className="flex items-center justify-center h-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary-600 dark:text-primary-400" />
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={isQuoteLoading ? '' : (quote?.amountOut || '')}
+                  placeholder="0.0"
+                  readOnly
+                  className="w-full text-2xl font-semibold bg-transparent border-none outline-none text-gray-400"
+                />
+              )}
             </div>
             <TokenSelector
               selectedToken={tokenOut}
@@ -129,7 +140,7 @@ export function SwapInterface() {
         </div>
 
         {/* Price Info */}
-        {quote && tokenIn && tokenOut && (
+        {!isQuoteLoading && quote && tokenIn && tokenOut && (
           <PriceInfo
             quote={quote}
             tokenIn={tokenIn}

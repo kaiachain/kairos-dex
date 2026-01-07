@@ -11,6 +11,7 @@ import { createUncheckedTradeFromQuote } from '@/lib/sdk-utils';
 import { SwapRouter, SwapOptions } from '@uniswap/v3-sdk';
 import { Percent } from '@uniswap/sdk-core';
 import { FeeAmount } from '@uniswap/v3-sdk';
+import { Loader2 } from 'lucide-react';
 
 interface SwapButtonProps {
   tokenIn: Token | null;
@@ -412,8 +413,9 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+        className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed flex items-center justify-center gap-2"
       >
+        <Loader2 className="w-5 h-5 animate-spin" />
         Fetching Quote...
       </button>
     );
@@ -445,8 +447,9 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-50"
+        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-50 flex items-center justify-center gap-2"
       >
+        <Loader2 className="w-5 h-5 animate-spin" />
         Approving...
       </button>
     );
@@ -456,8 +459,9 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-50"
+        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-50 flex items-center justify-center gap-2"
       >
+        <Loader2 className="w-5 h-5 animate-spin" />
         Swapping...
       </button>
     );
