@@ -393,21 +393,30 @@ export function SwapButton({
         return { valid: false, error: 'Pool has no liquidity. Cannot execute swap.' };
       }
       
-      // For very small swaps, we need at least some minimum liquidity
-      // For larger swaps, we need proportionally more liquidity
-      // A rough check: liquidity should be at least 10x the input amount for safety
-      const minLiquidityRequired = requiredAmount * BigInt(10);
+      // IMPORTANT: Uniswap V3 liquidity is stored in Q128.128 format (sqrt(x*y))
+      // It is NOT directly comparable to token amounts in wei
+      // Since QuoterV2 already validates the swap is possible, we trust the quote
+      // We only check for zero liquidity (empty pool) or extremely low values
       
-      if (liquidity < minLiquidityRequired) {
-        const liquidityFormatted = formatUnits(liquidity, 18); // Liquidity is in Q128.128 format, but we'll format as 18 decimals for display
-        const requiredFormatted = formatUnits(minLiquidityRequired, 18);
-        console.warn('Pool liquidity may be insufficient:', {
-          poolLiquidity: liquidity.toString(),
-          minRequired: minLiquidityRequired.toString(),
-          inputAmount: requiredAmount.toString(),
-        });
-        // We'll warn but not block - the quote should have already accounted for this
+      // For very small liquidity values, we use a minimal threshold
+      // This is a rough heuristic - liquidity values are typically much larger than token amounts
+      // A pool with 25 WKAIA and 50 USDT would have liquidity around 10^13-10^14 range
+      const MIN_LIQUIDITY_THRESHOLD = BigInt(1000); // Very low threshold for empty/near-empty pools
+      
+      if (liquidity < MIN_LIQUIDITY_THRESHOLD) {
+        return {
+          valid: false,
+          error: 'Pool has insufficient liquidity (pool may be empty or near-empty). Please add liquidity to the pool first.'
+        };
       }
+      
+      // Log liquidity for debugging, but don't block based on it
+      // QuoterV2 is the authoritative source for swap feasibility
+      console.log('Pool liquidity check (informational):', {
+        poolLiquidity: liquidity.toString(),
+        inputAmount: requiredAmount.toString(),
+        note: 'Liquidity is in Q128.128 format, not directly comparable to token amounts'
+      });
     }
 
     // 4.5: Pool state validation - Ensure pool is not locked
@@ -723,71 +732,28 @@ export function SwapButton({
             return;
           }
           
-          // For Uniswap V3, liquidity is stored in Q128.128 format
-          // A rough heuristic: liquidity should be significantly larger than the swap amount
-          // For small pools, we need at least 20x the input amount in liquidity
-          // For larger swaps, we need proportionally more
-          // Since liquidity is in Q128.128, we compare it directly (it's already scaled)
-          const minLiquidityMultiplier = BigInt(20); // Require at least 20x liquidity
-          const minLiquidityRequired = requiredAmount * minLiquidityMultiplier;
+          // IMPORTANT: Uniswap V3 liquidity is stored in Q128.128 format (sqrt(x*y))
+          // It is NOT directly comparable to token amounts in wei
+          // Since QuoterV2 already validated the swap and returned a quote, we trust it
+          // We only check for zero liquidity (empty pool) or extremely low values
           
-          // For very large swaps, increase the multiplier
-          // If swapping more than 1 token (assuming 18 decimals), need more liquidity
-          const oneToken = BigInt(10) ** BigInt(18);
-          if (requiredAmount > oneToken) {
-            // For swaps > 1 token, need at least 50x liquidity
-            const largeSwapMultiplier = BigInt(50);
-            const largeSwapMinLiquidity = requiredAmount * largeSwapMultiplier;
-            if (liquidity < largeSwapMinLiquidity) {
-              const liquidityFormatted = formatUnits(liquidity, 18);
-              const requiredFormatted = formatUnits(largeSwapMinLiquidity, 18);
-              const inputFormatted = formatUnits(requiredAmount, tokenIn.decimals);
-              alert(
-                `⚠️ Insufficient pool liquidity for this swap size!\n\n` +
-                `Swap amount: ${inputFormatted} ${tokenIn.symbol}\n` +
-                `Pool liquidity: ~${liquidityFormatted}\n` +
-                `Minimum required: ~${requiredFormatted}\n\n` +
-                `The pool needs more liquidity to handle this swap size safely.\n\n` +
-                `Recommendations:\n` +
-                `1. Try a smaller swap amount (less than ${formatUnits(requiredAmount / BigInt(2), tokenIn.decimals)} ${tokenIn.symbol})\n` +
-                `2. Add more liquidity to the pool\n` +
-                `3. Increase slippage tolerance significantly (5-10%)\n\n` +
-                `Note: Pool liquidity is currently too low for this swap size.`
-              );
-              return;
-            }
-          } else {
-            // For smaller swaps, use the standard multiplier
-            if (liquidity < minLiquidityRequired) {
-              const liquidityFormatted = formatUnits(liquidity, 18);
-              const requiredFormatted = formatUnits(minLiquidityRequired, 18);
-              const inputFormatted = formatUnits(requiredAmount, tokenIn.decimals);
-              console.warn('Pool liquidity may be insufficient:', {
-                poolLiquidity: liquidity.toString(),
-                minRequired: minLiquidityRequired.toString(),
-                inputAmount: requiredAmount.toString(),
-                multiplier: minLiquidityMultiplier.toString(),
-              });
-              
-              // Warn but allow if it's close (within 50% of required)
-              const warningThreshold = minLiquidityRequired * BigInt(50) / BigInt(100);
-              if (liquidity < warningThreshold) {
-                alert(
-                  `⚠️ Low pool liquidity warning!\n\n` +
-                  `Swap amount: ${inputFormatted} ${tokenIn.symbol}\n` +
-                  `Pool liquidity: ~${liquidityFormatted}\n` +
-                  `Recommended minimum: ~${requiredFormatted}\n\n` +
-                  `The pool may have insufficient liquidity for this swap.\n\n` +
-                  `Recommendations:\n` +
-                  `1. Try a smaller swap amount\n` +
-                  `2. Increase slippage tolerance (3-5%)\n` +
-                  `3. Add more liquidity to the pool\n\n` +
-                  `Proceeding may result in high price impact or swap failure.`
-                );
-                // Don't block, but warn the user
-              }
-            }
+          // For very small liquidity values, we use a minimal threshold
+          // This is a rough heuristic - liquidity values are typically much larger than token amounts
+          // A pool with 25 WKAIA and 50 USDT would have liquidity around 10^13-10^14 range
+          const MIN_LIQUIDITY_THRESHOLD = BigInt(1000); // Very low threshold for empty/near-empty pools
+          
+          if (liquidity < MIN_LIQUIDITY_THRESHOLD) {
+            alert('Pool has insufficient liquidity (pool may be empty or near-empty). Please add liquidity to the pool first.');
+            return;
           }
+          
+          // Log liquidity for debugging, but don't block based on it
+          // QuoterV2 is the authoritative source for swap feasibility
+          console.log('Pool liquidity check (informational):', {
+            poolLiquidity: liquidity.toString(),
+            inputAmount: requiredAmount.toString(),
+            note: 'Liquidity is in Q128.128 format, not directly comparable to token amounts. QuoterV2 quote is authoritative.'
+          });
           
           console.log('Pre-simulation state check:', {
             requiredAmount: requiredAmount.toString(),
@@ -1067,12 +1033,32 @@ export function SwapButton({
                 revertReason = `Contract revert: ${reason}`;
               }
             } else {
-              // Generic revert without specific reason - most common causes:
-              // 1. Insufficient allowance (router can't pull tokens)
-              // 2. Insufficient balance (user doesn't have tokens)
-              // 3. Slippage exceeded (price moved, output < minimum)
-              // 4. Pool locked (another swap in progress)
-              revertReason = 'Transaction would revert (likely: insufficient allowance, insufficient balance, slippage exceeded, or pool locked)';
+              // Generic revert without specific reason - check for "evm: ." pattern
+              // This is a common pattern when the revert reason is empty or not decoded
+              if (errorMessage.includes('evm:') || errorMessage.includes('evm: .') || (revertMatch && revertMatch[1] && (revertMatch[1].trim() === '.' || revertMatch[1].trim() === 'evm:'))) {
+                // "evm: ." typically means insufficient output amount (slippage) or insufficient liquidity
+                // Since we already checked allowance, balance, and pool state, this is likely:
+                // 1. Insufficient liquidity in the pool (most common with low liquidity pools)
+                // 2. Slippage exceeded (output < minimum required)
+                // 3. Price impact too high for available liquidity
+                revertReason = 'Swap failed: Insufficient liquidity or slippage exceeded\n\n' +
+                  'The pool does not have enough liquidity to execute this swap, or the price moved unfavorably.\n\n' +
+                  'Common causes:\n' +
+                  '1. Pool liquidity is too low for this swap size\n' +
+                  '2. Price moved between quote and execution (slippage)\n' +
+                  '3. High price impact due to low liquidity\n\n' +
+                  'Solutions:\n' +
+                  '1. Try a smaller swap amount\n' +
+                  '2. Increase slippage tolerance significantly (5-10%)\n' +
+                  '3. Wait for more liquidity to be added to the pool';
+              } else {
+                // Generic revert without specific reason - most common causes:
+                // 1. Insufficient allowance (router can't pull tokens)
+                // 2. Insufficient balance (user doesn't have tokens)
+                // 3. Slippage exceeded (price moved, output < minimum)
+                // 4. Pool locked (another swap in progress)
+                revertReason = 'Transaction would revert (likely: insufficient allowance, insufficient balance, slippage exceeded, or pool locked)';
+              }
             }
           }
           
