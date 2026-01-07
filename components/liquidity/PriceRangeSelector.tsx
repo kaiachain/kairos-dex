@@ -11,6 +11,7 @@ interface PriceRangeSelectorProps {
   onFullRangeChange: (fullRange: boolean) => void;
   calculatedPriceRange?: { min: number | null; max: number | null };
   currentTick?: number | null;
+  isFirstLiquidity?: boolean;
 }
 
 export function PriceRangeSelector({
@@ -22,6 +23,7 @@ export function PriceRangeSelector({
   onFullRangeChange,
   calculatedPriceRange,
   currentTick,
+  isFirstLiquidity = false,
 }: PriceRangeSelectorProps) {
   return (
     <div className="space-y-4">
@@ -32,11 +34,27 @@ export function PriceRangeSelector({
             type="checkbox"
             checked={fullRange}
             onChange={(e) => onFullRangeChange(e.target.checked)}
-            className="rounded"
+            disabled={isFirstLiquidity}
+            className="rounded disabled:opacity-50 disabled:cursor-not-allowed"
           />
-          <span className="text-sm">Full Range</span>
+          <span className={`text-sm ${isFirstLiquidity ? 'text-gray-400' : ''}`}>
+            Full Range
+          </span>
+          {isFirstLiquidity && (
+            <span className="text-xs text-yellow-600 dark:text-yellow-400 ml-2" title="Full range is not supported for first liquidity addition">
+              (Disabled)
+            </span>
+          )}
         </label>
       </div>
+
+      {isFirstLiquidity && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+          <p className="text-yellow-700 dark:text-yellow-300 text-xs">
+            <strong>Note:</strong> Full range positions are not supported for the first liquidity addition. Please use a custom price range instead.
+          </p>
+        </div>
+      )}
 
       {!fullRange && (
         <div className="grid grid-cols-2 gap-4">

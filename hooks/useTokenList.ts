@@ -10,6 +10,8 @@ const DEFAULT_TOKEN_ADDRESSES = [
   // Wrapped KAIA - required for Uniswap V3 pools
   ...(CONTRACT_WRAPPED_NATIVE_TOKEN ? [CONTRACT_WRAPPED_NATIVE_TOKEN] : []),
   '0xd077a400968890eacc75cdc901f0356c943e4fdb', // USDT
+  '0xf142b2781d37dBA0E13C992EB412F30A7aB768EA', // YTK
+  '0x30BA1A6c002ad0510e2521E6373C3e76f553D67f', // MTK
 ];
 
 export function useTokenList() {
