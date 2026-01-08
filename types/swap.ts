@@ -18,3 +18,14 @@ export interface SwapParams {
   amountOutMinimum: string;
 }
 
+export interface SwapExecutionResult {
+  success: boolean;
+  transactionHash?: string;
+  error?: Error;
+}
+
+export interface SwapValidationError {
+  type: 'insufficient_balance' | 'insufficient_allowance' | 'no_route' | 'invalid_input' | 'network_error';
+  message: string;
+  details?: Record<string, unknown>;
+}

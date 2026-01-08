@@ -1,17 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useSendTransaction, usePublicClient } from 'wagmi';
+import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Token } from '@/types/token';
 import { SwapQuote } from '@/types/swap';
-import { CONTRACTS } from '@/config/contracts';
-import { parseUnits, formatUnits } from '@/lib/utils';
-import { erc20Abi } from 'viem';
-import { Loader2 } from 'lucide-react';
-import { getAddress, isAddress, maxUint256 } from 'viem';
-import { JsonRpcProvider } from '@ethersproject/providers';
-import { RPC_URL } from '@/config/env';
-import { getRouterRoute } from '@/hooks/useSwapQuote';
+import { useSwapExecution, SwapStatus } from '@/hooks/useSwapExecution';
 
 interface SwapButtonProps {
   tokenIn: Token | null;
@@ -22,7 +14,7 @@ interface SwapButtonProps {
   deadline: number;
   quote: SwapQuote | null;
   isQuoteLoading: boolean;
-  onSwapSuccess?: () => void;
+  onSwapSuccess?: (hash: string) => void;
 }
 
 export function SwapButton({
@@ -36,306 +28,44 @@ export function SwapButton({
   isQuoteLoading,
   onSwapSuccess,
 }: SwapButtonProps) {
-  const { address, isConnected } = useAccount();
-  const publicClient = usePublicClient();
-  const [needsApproval, setNeedsApproval] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
-  const lastProcessedApprovalHash = useRef<string | undefined>(undefined);
-  const latestRefetchedAllowance = useRef<bigint | undefined>(undefined);
-  const refetchedAllowanceToken = useRef<string | undefined>(undefined);
-
-  const { writeContract: approveToken, data: approveHash } = useWriteContract();
-  const { isLoading: isApprovingTx, isSuccess: isApprovalConfirmed } = useWaitForTransactionReceipt({
-    hash: approveHash,
+  const {
+    needsApproval,
+    isApproving,
+    isSwapping,
+    isPreparingSwap,
+    status,
+    isConnected,
+    error,
+    approve,
+    executeSwap,
+    approveHash,
+    swapHash,
+    isSwapConfirmed,
+  } = useSwapExecution({
+    tokenIn,
+    tokenOut,
+    amountIn,
+    amountOut,
+    slippage,
+    deadline,
+    quote,
+    onSwapSuccess: onSwapSuccess ? ((hash: string) => onSwapSuccess(hash)) : undefined,
   });
 
-  const { sendTransaction: sendSwapTransaction, data: swapHash, error: sendSwapError } = useSendTransaction();
-  const { isLoading: isSwapping, isError: isSwapError, isSuccess: isSwapConfirmed, error: swapReceiptError } = useWaitForTransactionReceipt({
-    hash: swapHash,
-  });
+  // Show status indicator above button - use type assertion to avoid narrowing issues
+  const currentStatus = status as SwapStatus;
+  const showStatusIndicator = 
+    currentStatus === 'fetching_quote' ||
+    currentStatus === 'approval_needed' ||
+    currentStatus === 'approving' ||
+    currentStatus === 'approval_pending' ||
+    currentStatus === 'approval_confirmed' ||
+    currentStatus === 'preparing_swap' ||
+    currentStatus === 'swapping' ||
+    currentStatus === 'swap_pending' ||
+    currentStatus === 'swap_confirmed';
 
-  // Log swap errors
-  useEffect(() => {
-    if (sendSwapError) {
-      console.error('Send swap transaction error:', sendSwapError);
-      const errorMessage = String(sendSwapError?.message || sendSwapError || '');
-      if (errorMessage.includes('user rejected') || errorMessage.includes('User rejected')) {
-        console.log('User rejected the transaction');
-      } else if (errorMessage.includes('insufficient funds')) {
-        console.error('Insufficient funds for gas');
-      }
-    }
-    
-    if (swapHash && (isSwapError || swapReceiptError) && publicClient) {
-      const fetchRevertReason = async () => {
-        try {
-          console.log('Fetching transaction receipt to get revert reason...');
-          const receipt = await publicClient.getTransactionReceipt({ hash: swapHash });
-          
-          if (receipt.status === 'reverted') {
-            console.error('Transaction reverted on-chain. Receipt:', receipt);
-            console.error(`Transaction hash: ${swapHash}`);
-            console.error(`Block explorer: https://kairos.kaiascan.io/tx/${swapHash}`);
-          }
-        } catch (receiptError) {
-          console.error('Error fetching transaction receipt:', receiptError);
-        }
-      };
-      
-      fetchRevertReason();
-    }
-    
-    if (swapReceiptError) {
-      console.error('Swap receipt error:', swapReceiptError);
-      const errorMessage = String(swapReceiptError?.message || swapReceiptError || '');
-      
-      if (swapHash) {
-        alert(`Swap failed: ${errorMessage}\n\nTransaction hash: ${swapHash}\n\nCheck the block explorer for more details:\nhttps://kairos.kaiascan.io/tx/${swapHash}`);
-      } else {
-        alert(`Swap failed: ${errorMessage}\n\nCheck console for detailed error information.`);
-      }
-    }
-  }, [sendSwapError, swapReceiptError, isSwapError, publicClient, swapHash]);
-
-  // Call onSwapSuccess callback when swap transaction is confirmed
-  useEffect(() => {
-    if (isSwapConfirmed && onSwapSuccess) {
-      console.log('Swap transaction confirmed, calling onSwapSuccess callback');
-      onSwapSuccess();
-    }
-  }, [isSwapConfirmed, onSwapSuccess]);
-
-  // Check allowance
-  const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: tokenIn?.address as `0x${string}` | undefined,
-    abi: erc20Abi,
-    functionName: 'allowance',
-    args: address && tokenIn
-      ? [address, CONTRACTS.SwapRouter02 as `0x${string}`]
-      : undefined,
-    query: {
-      enabled: !!tokenIn && !!address,
-    },
-  });
-
-  // Check token balance
-  const { data: tokenBalance } = useReadContract({
-    address: tokenIn?.address as `0x${string}` | undefined,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: address ? [address] : undefined,
-    query: {
-      enabled: !!tokenIn && !!address,
-    },
-  });
-
-  // Refetch allowance when approval transaction is confirmed
-  useEffect(() => {
-    if (isApprovalConfirmed && refetchAllowance && approveHash && approveHash !== lastProcessedApprovalHash.current) {
-      console.log('Approval transaction confirmed, refetching allowance...', { hash: approveHash });
-      lastProcessedApprovalHash.current = approveHash;
-      
-      // Reset approving state
-      setIsApproving(false);
-      
-      const refetch = async () => {
-        try {
-          // Add a small delay to ensure blockchain state is updated
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          const result = await refetchAllowance();
-          console.log('Allowance refetched:', {
-            newAllowance: result.data?.toString(),
-            required: tokenIn && amountIn ? parseUnits(amountIn, tokenIn.decimals).toString() : 'N/A',
-            hasEnough: tokenIn && amountIn && result.data 
-              ? result.data >= parseUnits(amountIn, tokenIn.decimals)
-              : false,
-          });
-          
-          // Store the refetched allowance value to use in the needsApproval check
-          if (result.data !== undefined && tokenIn) {
-            latestRefetchedAllowance.current = result.data as bigint;
-            refetchedAllowanceToken.current = tokenIn.address;
-            
-            // Force a re-check of needsApproval after refetch
-            if (amountIn) {
-              const requiredAmount = parseUnits(amountIn, tokenIn.decimals);
-              const hasEnough = result.data >= requiredAmount;
-              console.log('Post-refetch allowance check:', {
-                allowance: result.data.toString(),
-                required: requiredAmount.toString(),
-                hasEnough,
-                willSetNeedsApproval: !hasEnough,
-              });
-              // Manually update needsApproval immediately with the refetched value
-              setNeedsApproval(!hasEnough);
-            }
-          }
-        } catch (error) {
-          console.error('Error refetching allowance:', error);
-        }
-      };
-      refetch();
-    }
-  }, [isApprovalConfirmed, refetchAllowance, approveHash, tokenIn, amountIn]);
-
-  // Clear refetched allowance when token changes
-  useEffect(() => {
-    if (tokenIn && refetchedAllowanceToken.current !== tokenIn.address) {
-      latestRefetchedAllowance.current = undefined;
-      refetchedAllowanceToken.current = undefined;
-    }
-  }, [tokenIn]);
-
-  // Check if approval is needed and validate balance
-  useEffect(() => {
-    if (!tokenIn || !amountIn) {
-      setNeedsApproval(false);
-      return;
-    }
-
-    if (allowance === undefined || tokenBalance === undefined) {
-      return;
-    }
-
-    // Use the latest refetched allowance if available and for the same token, otherwise use the hook value
-    // This ensures we use the most up-to-date value after a refetch
-    const currentAllowance = (
-      latestRefetchedAllowance.current !== undefined && 
-      refetchedAllowanceToken.current === tokenIn.address
-    ) 
-      ? latestRefetchedAllowance.current 
-      : allowance;
-
-    const requiredAmount = parseUnits(amountIn, tokenIn.decimals);
-    const hasEnoughBalance = tokenBalance >= requiredAmount;
-    const hasEnoughAllowance = currentAllowance >= requiredAmount;
-
-    if (!hasEnoughBalance) {
-      console.warn('Insufficient token balance:', {
-        required: requiredAmount.toString(),
-        available: tokenBalance.toString(),
-      });
-    }
-
-    if (!hasEnoughAllowance) {
-      console.log('Insufficient allowance detected:', {
-        required: requiredAmount.toString(),
-        approved: currentAllowance.toString(),
-        hookAllowance: allowance.toString(),
-        usingRefetched: latestRefetchedAllowance.current !== undefined,
-      });
-    } else {
-      // Clear the refetched allowance ref once we've confirmed we have enough and hook value has updated
-      // This allows the hook value to take over once it updates
-      if (
-        latestRefetchedAllowance.current !== undefined && 
-        refetchedAllowanceToken.current === tokenIn.address &&
-        allowance >= requiredAmount
-      ) {
-        latestRefetchedAllowance.current = undefined;
-        refetchedAllowanceToken.current = undefined;
-      }
-    }
-
-    setNeedsApproval(!hasEnoughAllowance);
-  }, [tokenIn, amountIn, allowance, tokenBalance]);
-
-  const handleApprove = async () => {
-    if (!tokenIn || !amountIn) return;
-    setIsApproving(true);
-    try {
-      // Approve MAX amount (type(uint256).max) so users only need to approve once
-      // This is a common pattern in DeFi to avoid repeated approvals
-      const maxApproval = maxUint256;
-
-      approveToken({
-        address: tokenIn.address as `0x${string}`,
-        abi: erc20Abi,
-        functionName: 'approve',
-        args: [
-          CONTRACTS.SwapRouter02 as `0x${string}`,
-          maxApproval,
-        ],
-      });
-    } catch (error) {
-      console.error('Approval error:', error);
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  /**
-   * Execute swap using Smart Order Router
-   * Following execute-swap-sdk.js pattern
-   */
-  const handleSwap = async () => {
-    if (!tokenIn || !tokenOut || !amountIn || !amountOut || !address || !quote) return;
-
-    // Validate balance
-    const requiredAmount = parseUnits(amountIn, tokenIn.decimals);
-    if (!tokenBalance || tokenBalance < requiredAmount) {
-      const balanceFormatted = tokenBalance ? formatUnits(tokenBalance, tokenIn.decimals) : '0';
-      const requiredFormatted = formatUnits(requiredAmount, tokenIn.decimals);
-      alert(`Insufficient ${tokenIn.symbol} balance. Required: ${requiredFormatted}, Available: ${balanceFormatted}`);
-      return;
-    }
-
-    // Validate allowance
-    if (!allowance || allowance < requiredAmount) {
-      const allowanceFormatted = allowance ? formatUnits(allowance, tokenIn.decimals) : '0';
-      const requiredFormatted = formatUnits(requiredAmount, tokenIn.decimals);
-      alert(`Insufficient token allowance. Required: ${requiredFormatted}, Approved: ${allowanceFormatted}. Please approve more tokens.`);
-      setNeedsApproval(true);
-      return;
-    }
-
-    try {
-      // Create provider from RPC URL
-      const provider = new JsonRpcProvider(RPC_URL);
-
-      // Get route from router (following execute-swap-sdk.js)
-      console.log('Getting route from Smart Order Router...');
-      const routeResult = await getRouterRoute(
-        tokenIn,
-        tokenOut,
-        amountIn,
-        slippage,
-        deadline,
-        address,
-        provider
-      );
-
-      if (!routeResult || !routeResult.methodParameters) {
-        console.error('No route found from router');
-        alert('No route found. Please try again.');
-        return;
-      }
-
-      console.log(`Route found: ${routeResult.quote.toExact()} ${tokenOut.symbol}`);
-
-      // Get fee data for transaction
-      const feeData = await provider.getFeeData();
-
-      // Send transaction using method parameters from router
-      // Following execute-swap-sdk.js: "Finally, we can construct a transaction from the method parameters"
-      console.log('Sending swap transaction...');
-      sendSwapTransaction({
-        to: CONTRACTS.SwapRouter02 as `0x${string}`,
-        data: routeResult.methodParameters.calldata as `0x${string}`,
-        value: routeResult.methodParameters.value ? BigInt(routeResult.methodParameters.value) : undefined,
-      });
-
-      console.log('Swap transaction sent successfully');
-    } catch (error) {
-      console.error('Swap error:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
-      alert('Swap failed. Please try again.');
-    }
-  };
-
+  // Not connected
   if (!isConnected) {
     return (
       <button
@@ -347,6 +77,7 @@ export function SwapButton({
     );
   }
 
+  // No tokens selected
   if (!tokenIn || !tokenOut) {
     return (
       <button
@@ -358,6 +89,7 @@ export function SwapButton({
     );
   }
 
+  // No amount entered
   if (!amountIn || parseFloat(amountIn) <= 0) {
     return (
       <button
@@ -369,6 +101,7 @@ export function SwapButton({
     );
   }
 
+  // Loading quote
   if (isQuoteLoading) {
     return (
       <button
@@ -381,6 +114,7 @@ export function SwapButton({
     );
   }
 
+  // No quote available
   if (!quote) {
     return (
       <button
@@ -392,10 +126,51 @@ export function SwapButton({
     );
   }
 
-  if (needsApproval && !isApproving && !isApprovingTx) {
+  // Error state
+  if (error || status === 'error') {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-800 dark:text-red-200 text-sm">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">{error?.message || 'An error occurred'}</span>
+        </div>
+        {needsApproval ? (
+          <button
+            onClick={approve}
+            className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+          >
+            Approve {tokenIn.symbol}
+          </button>
+        ) : (
+          <button
+            onClick={executeSwap}
+            className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+          >
+            Try Again
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Preparing swap (getting route)
+  if (isPreparingSwap || status === 'preparing_swap') {
     return (
       <button
-        onClick={handleApprove}
+        disabled
+        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
+      >
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Preparing Swap...
+      </button>
+    );
+  }
+
+  // Needs approval
+  if (needsApproval && !isApproving && status !== 'approval_pending' && status !== 'approval_confirmed') {
+    return (
+      <button
+        onClick={approve}
         className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
       >
         Approve {tokenIn.symbol}
@@ -403,36 +178,124 @@ export function SwapButton({
     );
   }
 
-  if (isApproving || isApprovingTx) {
+  // Approving (waiting for user confirmation)
+  if (status === 'approving') {
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
       >
         <Loader2 className="w-5 h-5 animate-spin" />
-        Approving...
+        Confirm Approval in Wallet
       </button>
     );
   }
 
-  if (isSwapping) {
+  // Approval pending (transaction sent, waiting for confirmation)
+  if (status === 'approval_pending' && approveHash) {
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
       >
         <Loader2 className="w-5 h-5 animate-spin" />
-        Swapping...
+        Approving... (Confirming)
       </button>
     );
   }
 
+  // Approval confirmed
+  if (status === 'approval_confirmed') {
+    return (
+      <button
+        onClick={executeSwap}
+        className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+      >
+        <CheckCircle2 className="w-5 h-5" />
+        Approval Confirmed - Swap Now
+      </button>
+    );
+  }
+
+  // Swapping (waiting for user confirmation)
+  if (status === 'swapping') {
+    return (
+      <button
+        disabled
+        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
+      >
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Confirm Swap in Wallet
+      </button>
+    );
+  }
+
+  // Swap pending (transaction sent, waiting for confirmation)
+  if (status === 'swap_pending' && swapHash) {
+    return (
+      <button
+        disabled
+        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
+      >
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Swapping... (Confirming)
+      </button>
+    );
+  }
+
+  // Swap confirmed
+  if (status === 'swap_confirmed') {
+    return (
+      <button
+        disabled
+        className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        <CheckCircle2 className="w-5 h-5" />
+        Swap Confirmed!
+      </button>
+    );
+  }
+
+  // Ready to swap
   return (
-    <button
-      onClick={handleSwap}
-      className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
-    >
-      Swap
-    </button>
+    <div className="space-y-2">
+      {showStatusIndicator && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-2 text-sm">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+            <span className="text-blue-800 dark:text-blue-200">
+              {(() => {
+                switch (currentStatus) {
+                  case 'fetching_quote':
+                    return 'Fetching best quote...';
+                  case 'approval_needed':
+                    return `Approval needed for ${tokenIn?.symbol}`;
+                  case 'approving':
+                  case 'approval_pending':
+                    return 'Approval transaction pending...';
+                  case 'approval_confirmed':
+                    return 'Approval confirmed! Ready to swap.';
+                  case 'preparing_swap':
+                    return 'Preparing swap route...';
+                  case 'swapping':
+                  case 'swap_pending':
+                    return 'Swap transaction pending...';
+                  case 'swap_confirmed':
+                    return 'Swap confirmed!';
+                  default:
+                    return '';
+                }
+              })()}
+            </span>
+          </div>
+        </div>
+      )}
+      <button
+        onClick={executeSwap}
+        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+      >
+        Swap
+      </button>
+    </div>
   );
 }
