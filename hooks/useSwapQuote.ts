@@ -42,6 +42,7 @@ async function getQuoteFromRouter(
   gasEstimate: string;
   poolAddress: string;
   route: any;
+  routePath: string[];
 } | null> {
   try {
     // Only run on client side
@@ -84,26 +85,89 @@ async function getQuoteFromRouter(
     const quote = route.quote;
     const amountOut = quote.toExact();
 
-    // Extract pool address from route
+    // Extract route path and pool information
     let poolAddress = "";
     let fee = 0;
+    const routePath: string[] = [tokenIn.address.toLowerCase()]; // Start with input token
+    
     if (route.route && Array.isArray(route.route) && route.route.length > 0) {
       const firstRoute = route.route[0] as any;
+      
       // Check if it's a V3 route
-      if (firstRoute && 'pools' in firstRoute && firstRoute.pools && Array.isArray(firstRoute.pools) && firstRoute.pools.length > 0) {
-        const pool = firstRoute.pools[0];
-        // Pool address is not directly available, we'll need to derive it
-        // For now, we'll use a placeholder and extract from route data
-        poolAddress = ""; // Will be extracted from route if available
-        fee = pool.fee || 0;
+      if (firstRoute && 'pools' in firstRoute && firstRoute.pools && Array.isArray(firstRoute.pools)) {
+        // Try to extract path from route.path if available (most reliable)
+        if (firstRoute.path && Array.isArray(firstRoute.path)) {
+          routePath.length = 0; // Reset
+          routePath.push(...firstRoute.path.map((t: any) => {
+            if (typeof t === 'string') return t.toLowerCase();
+            if (t?.address) return t.address.toLowerCase();
+            return null;
+          }).filter(Boolean) as string[]);
+        } else {
+          // Fallback: Extract token path from pools (multi-hop support)
+          let currentToken = tokenIn.address.toLowerCase();
+          
+          for (const pool of firstRoute.pools) {
+            // Try different property names for tokens
+            const token0 = pool.token0?.address?.toLowerCase() || 
+                         pool.tokenA?.address?.toLowerCase() ||
+                         (typeof pool.token0 === 'string' ? pool.token0.toLowerCase() : null);
+            const token1 = pool.token1?.address?.toLowerCase() || 
+                         pool.tokenB?.address?.toLowerCase() ||
+                         (typeof pool.token1 === 'string' ? pool.token1.toLowerCase() : null);
+            
+            if (token0 && token1) {
+              // Find which token is the output (not the current token)
+              const nextToken = currentToken === token0 ? token1 : 
+                              currentToken === token1 ? token0 : null;
+              
+              if (nextToken && !routePath.includes(nextToken)) {
+                routePath.push(nextToken);
+                currentToken = nextToken;
+              }
+            }
+          }
+          
+          // Ensure output token is in the path
+          const tokenOutLower = tokenOut.address.toLowerCase();
+          if (routePath[routePath.length - 1] !== tokenOutLower) {
+            routePath.push(tokenOutLower);
+          }
+        }
+        
+        // Extract fee from first pool
+        if (firstRoute.pools.length > 0) {
+          const firstPool = firstRoute.pools[0];
+          fee = firstPool.fee || firstPool.feeTier || 0;
+          
+          // Get pool address if available
+          if (firstPool.poolAddress) {
+            poolAddress = firstPool.poolAddress;
+          } else if (firstPool.address) {
+            poolAddress = firstPool.address;
+          }
+        }
       } else if (firstRoute && 'path' in firstRoute) {
-        // V2 route - not applicable for V3
-        fee = 0;
+        // V2 route - extract path directly
+        if (Array.isArray(firstRoute.path)) {
+          routePath.length = 0; // Reset
+          routePath.push(...firstRoute.path.map((t: any) => 
+            (typeof t === 'string' ? t : t.address)?.toLowerCase()
+          ).filter(Boolean));
+        }
       }
     }
 
     // Get gas estimate
     const gasEstimate = route.estimatedGasUsed?.toString() || "0";
+
+    // Log route information for debugging
+    console.log('Route found:', {
+      hops: routePath.length - 1,
+      path: routePath,
+      amountOut,
+      pools: route.route?.[0]?.pools?.length || 0
+    });
 
     return {
       amountOut,
@@ -111,9 +175,15 @@ async function getQuoteFromRouter(
       gasEstimate,
       poolAddress,
       route: route.route,
+      routePath, // Add extracted path
     };
   } catch (error) {
     console.error("Error getting quote from router:", error);
+    // Log more details about the error for debugging
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return null;
   }
 }
@@ -181,13 +251,18 @@ export function useSwapQuote(
         // For now, we'll set it to 0 and calculate it properly when we have trade data
         const priceImpact = 0;
 
+        // Use extracted route path if available, otherwise fallback to direct path
+        const routePath = quoteResult.routePath && quoteResult.routePath.length > 0
+          ? quoteResult.routePath
+          : [tokenIn.address.toLowerCase(), tokenOut.address.toLowerCase()];
+
         setQuote({
           amountOut: quoteResult.amountOut,
           price,
           priceImpact,
           fee: quoteResult.fee,
           gasEstimate: quoteResult.gasEstimate,
-          route: [tokenIn.address, tokenOut.address],
+          route: routePath, // Use extracted multi-hop path
           poolAddress: quoteResult.poolAddress,
         });
       } catch (err) {
@@ -261,11 +336,20 @@ export async function getRouterRoute(
       type: SwapType?.SWAP_ROUTER_02 ?? 1, // SWAP_ROUTER_02 = 1
     };
 
-    // Get route
+    // Get route - the router automatically finds multi-hop routes
+    console.log(`Getting route for execution: ${tokenIn.symbol} -> ${tokenOut.symbol}`);
     const route = await router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, options);
 
     if (!route || !route.methodParameters) {
+      console.warn(`No route found for execution: ${tokenIn.symbol} -> ${tokenOut.symbol}`);
       return null;
+    }
+
+    // Log route information for debugging
+    if (route.route && Array.isArray(route.route) && route.route.length > 0) {
+      const firstRoute = route.route[0] as any;
+      const poolCount = firstRoute?.pools?.length || 0;
+      console.log(`Route found for execution: ${poolCount} pool(s) in path`);
     }
 
     return {
@@ -275,6 +359,11 @@ export async function getRouterRoute(
     };
   } catch (error) {
     console.error("Error getting router route:", error);
+    // Log more details about the error for debugging
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return null;
   }
 }
