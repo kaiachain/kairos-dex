@@ -146,6 +146,7 @@ export function SwapInterface() {
             tokenIn={tokenIn}
             tokenOut={tokenOut}
             slippage={slippage}
+            amountIn={amountIn}
           />
         )}
 
