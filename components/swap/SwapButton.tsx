@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useSendTransaction, usePublicClient } from 'wagmi';
 import { Token } from '@/types/token';
 import { SwapQuote } from '@/types/swap';
@@ -8,7 +8,7 @@ import { CONTRACTS } from '@/config/contracts';
 import { parseUnits, formatUnits } from '@/lib/utils';
 import { erc20Abi } from 'viem';
 import { Loader2 } from 'lucide-react';
-import { getAddress, isAddress } from 'viem';
+import { getAddress, isAddress, maxUint256 } from 'viem';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { RPC_URL } from '@/config/env';
 import { getRouterRoute } from '@/hooks/useSwapQuote';
@@ -38,9 +38,12 @@ export function SwapButton({
   const publicClient = usePublicClient();
   const [needsApproval, setNeedsApproval] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const lastProcessedApprovalHash = useRef<string | undefined>(undefined);
+  const latestRefetchedAllowance = useRef<bigint | undefined>(undefined);
+  const refetchedAllowanceToken = useRef<string | undefined>(undefined);
 
   const { writeContract: approveToken, data: approveHash } = useWriteContract();
-  const { isLoading: isApprovingTx } = useWaitForTransactionReceipt({
+  const { isLoading: isApprovingTx, isSuccess: isApprovalConfirmed } = useWaitForTransactionReceipt({
     hash: approveHash,
   });
 
@@ -93,7 +96,7 @@ export function SwapButton({
   }, [sendSwapError, swapReceiptError, isSwapError, publicClient, swapHash]);
 
   // Check allowance
-  const { data: allowance } = useReadContract({
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: tokenIn?.address as `0x${string}` | undefined,
     abi: erc20Abi,
     functionName: 'allowance',
@@ -116,6 +119,63 @@ export function SwapButton({
     },
   });
 
+  // Refetch allowance when approval transaction is confirmed
+  useEffect(() => {
+    if (isApprovalConfirmed && refetchAllowance && approveHash && approveHash !== lastProcessedApprovalHash.current) {
+      console.log('Approval transaction confirmed, refetching allowance...', { hash: approveHash });
+      lastProcessedApprovalHash.current = approveHash;
+      
+      // Reset approving state
+      setIsApproving(false);
+      
+      const refetch = async () => {
+        try {
+          // Add a small delay to ensure blockchain state is updated
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const result = await refetchAllowance();
+          console.log('Allowance refetched:', {
+            newAllowance: result.data?.toString(),
+            required: tokenIn && amountIn ? parseUnits(amountIn, tokenIn.decimals).toString() : 'N/A',
+            hasEnough: tokenIn && amountIn && result.data 
+              ? result.data >= parseUnits(amountIn, tokenIn.decimals)
+              : false,
+          });
+          
+          // Store the refetched allowance value to use in the needsApproval check
+          if (result.data !== undefined && tokenIn) {
+            latestRefetchedAllowance.current = result.data as bigint;
+            refetchedAllowanceToken.current = tokenIn.address;
+            
+            // Force a re-check of needsApproval after refetch
+            if (amountIn) {
+              const requiredAmount = parseUnits(amountIn, tokenIn.decimals);
+              const hasEnough = result.data >= requiredAmount;
+              console.log('Post-refetch allowance check:', {
+                allowance: result.data.toString(),
+                required: requiredAmount.toString(),
+                hasEnough,
+                willSetNeedsApproval: !hasEnough,
+              });
+              // Manually update needsApproval immediately with the refetched value
+              setNeedsApproval(!hasEnough);
+            }
+          }
+        } catch (error) {
+          console.error('Error refetching allowance:', error);
+        }
+      };
+      refetch();
+    }
+  }, [isApprovalConfirmed, refetchAllowance, approveHash, tokenIn, amountIn]);
+
+  // Clear refetched allowance when token changes
+  useEffect(() => {
+    if (tokenIn && refetchedAllowanceToken.current !== tokenIn.address) {
+      latestRefetchedAllowance.current = undefined;
+      refetchedAllowanceToken.current = undefined;
+    }
+  }, [tokenIn]);
+
   // Check if approval is needed and validate balance
   useEffect(() => {
     if (!tokenIn || !amountIn) {
@@ -127,9 +187,18 @@ export function SwapButton({
       return;
     }
 
+    // Use the latest refetched allowance if available and for the same token, otherwise use the hook value
+    // This ensures we use the most up-to-date value after a refetch
+    const currentAllowance = (
+      latestRefetchedAllowance.current !== undefined && 
+      refetchedAllowanceToken.current === tokenIn.address
+    ) 
+      ? latestRefetchedAllowance.current 
+      : allowance;
+
     const requiredAmount = parseUnits(amountIn, tokenIn.decimals);
     const hasEnoughBalance = tokenBalance >= requiredAmount;
-    const hasEnoughAllowance = allowance >= requiredAmount;
+    const hasEnoughAllowance = currentAllowance >= requiredAmount;
 
     if (!hasEnoughBalance) {
       console.warn('Insufficient token balance:', {
@@ -141,8 +210,21 @@ export function SwapButton({
     if (!hasEnoughAllowance) {
       console.log('Insufficient allowance detected:', {
         required: requiredAmount.toString(),
-        approved: allowance.toString(),
+        approved: currentAllowance.toString(),
+        hookAllowance: allowance.toString(),
+        usingRefetched: latestRefetchedAllowance.current !== undefined,
       });
+    } else {
+      // Clear the refetched allowance ref once we've confirmed we have enough and hook value has updated
+      // This allows the hook value to take over once it updates
+      if (
+        latestRefetchedAllowance.current !== undefined && 
+        refetchedAllowanceToken.current === tokenIn.address &&
+        allowance >= requiredAmount
+      ) {
+        latestRefetchedAllowance.current = undefined;
+        refetchedAllowanceToken.current = undefined;
+      }
     }
 
     setNeedsApproval(!hasEnoughAllowance);
@@ -152,10 +234,9 @@ export function SwapButton({
     if (!tokenIn || !amountIn) return;
     setIsApproving(true);
     try {
-      // Approve a bit more than needed to avoid needing re-approval for small amounts
-      const amountInWei = parseUnits(amountIn, tokenIn.decimals);
-      // Approve 110% of input amount to account for small variations
-      const approveAmount = (amountInWei * BigInt(110)) / BigInt(100);
+      // Approve MAX amount (type(uint256).max) so users only need to approve once
+      // This is a common pattern in DeFi to avoid repeated approvals
+      const maxApproval = maxUint256;
 
       approveToken({
         address: tokenIn.address as `0x${string}`,
@@ -163,7 +244,7 @@ export function SwapButton({
         functionName: 'approve',
         args: [
           CONTRACTS.SwapRouter02 as `0x${string}`,
-          approveAmount,
+          maxApproval,
         ],
       });
     } catch (error) {
