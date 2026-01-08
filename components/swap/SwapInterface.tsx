@@ -21,7 +21,8 @@ export function SwapInterface() {
   const [deadline, setDeadline] = useState(20);
   const [expertMode, setExpertMode] = useState(false);
 
-  const { data: balanceIn } = useTokenBalance(tokenIn);
+  const { data: balanceIn, refetch: refetchBalanceIn } = useTokenBalance(tokenIn);
+  const { data: balanceOut, refetch: refetchBalanceOut } = useTokenBalance(tokenOut);
   const { data: quote, isLoading: isQuoteLoading } = useSwapQuote(
     tokenIn,
     tokenOut,
@@ -40,6 +41,19 @@ export function SwapInterface() {
   const handleMax = () => {
     if (balanceIn) {
       setAmountIn(balanceIn);
+    }
+  };
+
+  const handleSwapSuccess = () => {
+    // Reset input amount
+    setAmountIn('');
+    
+    // Refetch balances for both tokens to show updated amounts
+    if (refetchBalanceIn) {
+      refetchBalanceIn();
+    }
+    if (refetchBalanceOut) {
+      refetchBalanceOut();
     }
   };
 
@@ -160,6 +174,7 @@ export function SwapInterface() {
           deadline={deadline}
           quote={quote}
           isQuoteLoading={isQuoteLoading}
+          onSwapSuccess={handleSwapSuccess}
         />
       </div>
     </div>

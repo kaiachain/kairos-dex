@@ -22,6 +22,7 @@ interface SwapButtonProps {
   deadline: number;
   quote: SwapQuote | null;
   isQuoteLoading: boolean;
+  onSwapSuccess?: () => void;
 }
 
 export function SwapButton({
@@ -33,6 +34,7 @@ export function SwapButton({
   deadline,
   quote,
   isQuoteLoading,
+  onSwapSuccess,
 }: SwapButtonProps) {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
@@ -48,7 +50,7 @@ export function SwapButton({
   });
 
   const { sendTransaction: sendSwapTransaction, data: swapHash, error: sendSwapError } = useSendTransaction();
-  const { isLoading: isSwapping, isError: isSwapError, error: swapReceiptError } = useWaitForTransactionReceipt({
+  const { isLoading: isSwapping, isError: isSwapError, isSuccess: isSwapConfirmed, error: swapReceiptError } = useWaitForTransactionReceipt({
     hash: swapHash,
   });
 
@@ -94,6 +96,14 @@ export function SwapButton({
       }
     }
   }, [sendSwapError, swapReceiptError, isSwapError, publicClient, swapHash]);
+
+  // Call onSwapSuccess callback when swap transaction is confirmed
+  useEffect(() => {
+    if (isSwapConfirmed && onSwapSuccess) {
+      console.log('Swap transaction confirmed, calling onSwapSuccess callback');
+      onSwapSuccess();
+    }
+  }, [isSwapConfirmed, onSwapSuccess]);
 
   // Check allowance
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
