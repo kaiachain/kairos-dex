@@ -75,9 +75,11 @@ async function getQuoteFromRouter(
     };
 
     // Get route
+    console.log(`Finding route: ${tokenIn.symbol} -> ${tokenOut.symbol}`);
     const route = await router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, options);
 
     if (!route || !route.methodParameters) {
+      console.warn(`No route found for ${tokenIn.symbol} -> ${tokenOut.symbol}`);
       return null;
     }
 
@@ -85,13 +87,153 @@ async function getQuoteFromRouter(
     const quote = route.quote;
     const amountOut = quote.toExact();
 
+    // Debug: Log the route structure - log the full route object for inspection
+    console.log('Full route object:', route);
+    console.log('Route object structure:', {
+      hasRoute: !!route.route,
+      routeType: Array.isArray(route.route) ? 'array' : typeof route.route,
+      routeLength: Array.isArray(route.route) ? route.route.length : 'N/A',
+      routeKeys: Object.keys(route),
+      hasTrade: 'trade' in route,
+      hasTokenPath: 'tokenPath' in route,
+      firstRoute: route.route && Array.isArray(route.route) ? route.route[0] : null,
+    });
+    
+    // Check if route has a trade property with route information
+    if (route.trade) {
+      console.log('Route has trade property:', {
+        tradeType: typeof route.trade,
+        tradeKeys: Object.keys(route.trade),
+        hasRoutes: 'routes' in route.trade,
+        routes: route.trade.routes,
+      });
+    }
+    
+    // Try to extract path from route.tokenPath if available (some router versions have this)
+    if ('tokenPath' in route && Array.isArray((route as any).tokenPath)) {
+      const tokenPath = (route as any).tokenPath.map((t: any) => {
+        if (typeof t === 'string') return t.toLowerCase();
+        if (t?.address) return t.address.toLowerCase();
+        return null;
+      }).filter(Boolean) as string[];
+      
+      if (tokenPath.length > 0) {
+        console.log('Found tokenPath on route object:', tokenPath);
+        return {
+          amountOut,
+          fee: 0,
+          gasEstimate: route.estimatedGasUsed?.toString() || "0",
+          poolAddress: "",
+          route: route.route,
+          routePath: tokenPath,
+        };
+      }
+    }
+
     // Extract route path and pool information
     let poolAddress = "";
     let fee = 0;
     const routePath: string[] = [tokenIn.address.toLowerCase()]; // Start with input token
     
+    // Try multiple extraction methods
+    
+    // Method 1: Try route.trade.routes (newer router versions)
+    if (route.trade && route.trade.routes && Array.isArray(route.trade.routes) && route.trade.routes.length > 0) {
+      console.log('Found route.trade.routes, extracting path...');
+      const firstTradeRoute = route.trade.routes[0] as any;
+      
+      // Try route.trade.routes[0].path first (direct property - THIS IS THE ONE!)
+      if (firstTradeRoute?.path && Array.isArray(firstTradeRoute.path)) {
+        console.log('Found firstTradeRoute.path, extracting...', firstTradeRoute.path);
+        const tokenPath = firstTradeRoute.path.map((t: any) => {
+          // Token objects from SDK have address property
+          if (t?.address) {
+            return t.address.toLowerCase();
+          }
+          // Fallback for string addresses
+          if (typeof t === 'string') {
+            return t.toLowerCase();
+          }
+          console.warn('Unknown token format in path:', t);
+          return null;
+        }).filter(Boolean) as string[];
+        
+        if (tokenPath.length > 0) {
+          console.log('✅ Extracted path from route.trade.routes[0].path:', tokenPath);
+          routePath.length = 0;
+          routePath.push(...tokenPath);
+        } else {
+          console.warn('Failed to extract path from firstTradeRoute.path');
+        }
+      }
+      
+      // Fallback: Try route.trade.routes[0].tokenPath (direct property)
+      if (routePath.length <= 1 && firstTradeRoute?.tokenPath && Array.isArray(firstTradeRoute.tokenPath)) {
+        console.log('Trying firstTradeRoute.tokenPath as fallback...', firstTradeRoute.tokenPath);
+        const tokenPath = firstTradeRoute.tokenPath.map((t: any) => {
+          if (t?.address) {
+            return t.address.toLowerCase();
+          }
+          if (typeof t === 'string') {
+            return t.toLowerCase();
+          }
+          return null;
+        }).filter(Boolean) as string[];
+        
+        if (tokenPath.length > 0) {
+          console.log('✅ Extracted path from route.trade.routes[0].tokenPath:', tokenPath);
+          routePath.length = 0;
+          routePath.push(...tokenPath);
+        }
+      }
+      
+      // Try extracting from pools in trade route
+      if (routePath.length <= 1 && firstTradeRoute?.pools && Array.isArray(firstTradeRoute.pools)) {
+        console.log('Extracting from route.trade.routes[0].pools...');
+        routePath.length = 0;
+        routePath.push(tokenIn.address.toLowerCase());
+        let currentToken = tokenIn.address.toLowerCase();
+        
+        for (const pool of firstTradeRoute.pools) {
+          const token0 = pool.token0?.address?.toLowerCase() || 
+                       (typeof pool.token0 === 'string' ? pool.token0.toLowerCase() : null);
+          const token1 = pool.token1?.address?.toLowerCase() || 
+                       (typeof pool.token1 === 'string' ? pool.token1.toLowerCase() : null);
+          
+          if (token0 && token1) {
+            const nextToken = currentToken === token0 ? token1 : 
+                            currentToken === token1 ? token0 : null;
+            
+            if (nextToken && !routePath.includes(nextToken)) {
+              routePath.push(nextToken);
+              currentToken = nextToken;
+            }
+          }
+        }
+        
+        const tokenOutLower = tokenOut.address.toLowerCase();
+        if (routePath[routePath.length - 1] !== tokenOutLower) {
+          routePath.push(tokenOutLower);
+        }
+        
+        if (routePath.length > 1) {
+          console.log('Extracted path from route.trade.routes[0].pools:', routePath);
+        }
+      }
+    }
+    
+    // Fallback to route.route structure
     if (route.route && Array.isArray(route.route) && route.route.length > 0) {
       const firstRoute = route.route[0] as any;
+      
+      // Debug: Log first route structure
+      console.log('First route structure:', {
+        hasPools: 'pools' in firstRoute,
+        poolsLength: firstRoute?.pools?.length || 0,
+        hasPath: 'path' in firstRoute,
+        pathType: firstRoute?.path ? (Array.isArray(firstRoute.path) ? 'array' : typeof firstRoute.path) : 'none',
+        routeKeys: Object.keys(firstRoute || {}),
+      });
       
       // Check if it's a V3 route
       if (firstRoute && 'pools' in firstRoute && firstRoute.pools && Array.isArray(firstRoute.pools)) {
@@ -103,11 +245,29 @@ async function getQuoteFromRouter(
             if (t?.address) return t.address.toLowerCase();
             return null;
           }).filter(Boolean) as string[]);
+          console.log('Extracted path from route.path:', routePath);
         } else {
           // Fallback: Extract token path from pools (multi-hop support)
+          routePath.length = 0; // Reset to rebuild from pools
+          routePath.push(tokenIn.address.toLowerCase()); // Start with input token
           let currentToken = tokenIn.address.toLowerCase();
           
-          for (const pool of firstRoute.pools) {
+          console.log('Extracting path from pools, starting with:', currentToken);
+          
+          for (let i = 0; i < firstRoute.pools.length; i++) {
+            const pool = firstRoute.pools[i];
+            
+            // Debug: Log pool structure
+            if (i === 0) {
+              console.log('First pool structure:', {
+                hasToken0: 'token0' in pool,
+                hasToken1: 'token1' in pool,
+                token0Type: typeof pool.token0,
+                token1Type: typeof pool.token1,
+                poolKeys: Object.keys(pool),
+              });
+            }
+            
             // Try different property names for tokens
             const token0 = pool.token0?.address?.toLowerCase() || 
                          pool.tokenA?.address?.toLowerCase() ||
@@ -116,13 +276,18 @@ async function getQuoteFromRouter(
                          pool.tokenB?.address?.toLowerCase() ||
                          (typeof pool.token1 === 'string' ? pool.token1.toLowerCase() : null);
             
+            console.log(`Pool ${i}: token0=${token0}, token1=${token1}, currentToken=${currentToken}`);
+            
             if (token0 && token1) {
               // Find which token is the output (not the current token)
               const nextToken = currentToken === token0 ? token1 : 
                               currentToken === token1 ? token0 : null;
               
-              if (nextToken && !routePath.includes(nextToken)) {
-                routePath.push(nextToken);
+              if (nextToken) {
+                if (!routePath.includes(nextToken)) {
+                  routePath.push(nextToken);
+                  console.log(`Added token to path: ${nextToken}, path now:`, routePath);
+                }
                 currentToken = nextToken;
               }
             }
@@ -132,7 +297,10 @@ async function getQuoteFromRouter(
           const tokenOutLower = tokenOut.address.toLowerCase();
           if (routePath[routePath.length - 1] !== tokenOutLower) {
             routePath.push(tokenOutLower);
+            console.log('Added output token to path:', tokenOutLower);
           }
+          
+          console.log('Final path extracted from pools:', routePath);
         }
         
         // Extract fee from first pool
@@ -158,6 +326,20 @@ async function getQuoteFromRouter(
       }
     }
 
+    // Ensure we always have at least input and output tokens
+    const tokenInLower = tokenIn.address.toLowerCase();
+    const tokenOutLower = tokenOut.address.toLowerCase();
+    
+    if (routePath.length === 1 && routePath[0] === tokenInLower) {
+      // Only input token found, add output token
+      routePath.push(tokenOutLower);
+      console.log('Added output token to path (fallback):', routePath);
+    } else if (routePath.length > 1 && routePath[routePath.length - 1] !== tokenOutLower) {
+      // Path exists but doesn't end with output token
+      routePath.push(tokenOutLower);
+      console.log('Added output token to end of path:', routePath);
+    }
+
     // Get gas estimate
     const gasEstimate = route.estimatedGasUsed?.toString() || "0";
 
@@ -166,7 +348,8 @@ async function getQuoteFromRouter(
       hops: routePath.length - 1,
       path: routePath,
       amountOut,
-      pools: route.route?.[0]?.pools?.length || 0
+      pools: route.route?.[0]?.pools?.length || route.trade?.routes?.[0]?.route?.pools?.length || 0,
+      routeStructure: route.route ? 'route.route' : route.trade ? 'route.trade' : 'unknown'
     });
 
     return {
@@ -255,6 +438,13 @@ export function useSwapQuote(
         const routePath = quoteResult.routePath && quoteResult.routePath.length > 0
           ? quoteResult.routePath
           : [tokenIn.address.toLowerCase(), tokenOut.address.toLowerCase()];
+
+        console.log('Setting quote with route:', {
+          routePath,
+          routePathLength: routePath.length,
+          hasRoutePath: !!quoteResult.routePath,
+          originalRoutePath: quoteResult.routePath,
+        });
 
         setQuote({
           amountOut: quoteResult.amountOut,

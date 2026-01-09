@@ -7,6 +7,7 @@ import { formatNumber, formatBalance } from '@/lib/utils';
 import { Info, AlertTriangle } from 'lucide-react';
 import { calculatePriceImpact, calculateSuggestedSlippage, calculateOptimalSwapSize } from '@/lib/swap-utils';
 import { usePoolDetails } from '@/hooks/usePoolDetails';
+import { RouteDisplay } from './RouteDisplay';
 
 interface PriceInfoProps {
   quote: SwapQuote;
@@ -72,7 +73,16 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
   const slippageInsufficient = priceImpact > slippage * 0.8; // Warn if price impact is >80% of slippage
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-2 text-sm">
+    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-3 text-sm">
+      {/* Route Display */}
+      {quote.route && quote.route.length > 0 && (
+        <RouteDisplay
+          route={quote.route}
+          tokenIn={tokenIn}
+          tokenOut={tokenOut}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <span className="text-gray-600 dark:text-gray-400">Price</span>
         <span className="font-medium">
