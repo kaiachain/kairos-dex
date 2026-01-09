@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { TokenSelector } from './TokenSelector';
 import { SwapButton } from './SwapButton';
@@ -32,6 +32,21 @@ export function SwapInterface() {
 
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [swapHash, setSwapHash] = useState<string | null>(null);
+  
+  // Store swap details for confirmation display
+  const swapDetailsRef = useRef<{
+    tokenIn: Token;
+    tokenOut: Token;
+    amountIn: string;
+    amountOut: string;
+  } | null>(null);
+  
+  // Track previous form values to detect changes
+  const prevTokenInRef = useRef<Token | null>(null);
+  const prevTokenOutRef = useRef<Token | null>(null);
+  const prevAmountInRef = useRef<string>('');
+  const hasShownConfirmationRef = useRef(false);
+  const isProcessingSwapSuccessRef = useRef(false);
 
   const handleReverse = useCallback(() => {
     const temp = tokenIn;
@@ -49,15 +64,102 @@ export function SwapInterface() {
   }, [balanceIn]);
 
   const handleSwapSuccess = useCallback((hash: string) => {
+    console.log('Swap success callback called with hash:', hash);
+    console.log('Current swap details:', { tokenIn, tokenOut, amountIn, amountOut: quote?.amountOut });
+    
+    // Store swap details before clearing the form
+    if (tokenIn && tokenOut && amountIn && quote?.amountOut) {
+      swapDetailsRef.current = {
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOut: quote.amountOut,
+      };
+      console.log('Stored swap details:', swapDetailsRef.current);
+    } else {
+      console.warn('Missing swap details:', { tokenIn: !!tokenIn, tokenOut: !!tokenOut, amountIn, amountOut: !!quote?.amountOut });
+    }
+    
+    // Mark that we're processing a swap success to prevent form change detection from resetting
+    isProcessingSwapSuccessRef.current = true;
+    
     setSwapHash(hash);
+    hasShownConfirmationRef.current = true;
+    
+    // Show confirmation immediately
+    setShowConfirmation(true);
+    console.log('Setting showConfirmation to true');
+    
+    // Clear form after showing confirmation
     setAmountIn('');
     refetchBalanceIn?.();
     refetchBalanceOut?.();
-    // Show confirmation after a brief delay
+    
+    // Allow form change detection after a delay
     setTimeout(() => {
-      setShowConfirmation(true);
-    }, 500);
-  }, [refetchBalanceIn, refetchBalanceOut]);
+      isProcessingSwapSuccessRef.current = false;
+      console.log('Swap success processing complete');
+    }, 1000);
+  }, [refetchBalanceIn, refetchBalanceOut, tokenIn, tokenOut, amountIn, quote]);
+
+  // Reset confirmation on page load/reload
+  // Note: React state automatically resets on page reload, but we ensure refs are cleared too
+  useEffect(() => {
+    // Reset confirmation state and refs on mount (handles page reload)
+    setShowConfirmation(false);
+    setSwapHash(null);
+    swapDetailsRef.current = null;
+    hasShownConfirmationRef.current = false;
+    isProcessingSwapSuccessRef.current = false;
+  }, []);
+
+  // Reset confirmation when user changes swap form values
+  useEffect(() => {
+    // Don't reset if we're currently processing a swap success
+    if (isProcessingSwapSuccessRef.current) {
+      // Update refs without resetting
+      prevTokenInRef.current = tokenIn;
+      prevTokenOutRef.current = tokenOut;
+      prevAmountInRef.current = amountIn;
+      return;
+    }
+
+    // Only reset if we've shown a confirmation before
+    if (!hasShownConfirmationRef.current || !showConfirmation) {
+      // Update refs without resetting
+      prevTokenInRef.current = tokenIn;
+      prevTokenOutRef.current = tokenOut;
+      prevAmountInRef.current = amountIn;
+      return;
+    }
+
+    // Check if any form value has changed (only reset on user-initiated changes)
+    const tokenInChanged = 
+      (prevTokenInRef.current?.address !== tokenIn?.address) ||
+      (prevTokenInRef.current === null && tokenIn !== null) ||
+      (prevTokenInRef.current !== null && tokenIn === null);
+    
+    const tokenOutChanged = 
+      (prevTokenOutRef.current?.address !== tokenOut?.address) ||
+      (prevTokenOutRef.current === null && tokenOut !== null) ||
+      (prevTokenOutRef.current !== null && tokenOut === null);
+    
+    // Only consider amountIn changed if it's not empty (user typing, not clearing after swap)
+    const amountInChanged = prevAmountInRef.current !== amountIn && amountIn !== '';
+
+    if (tokenInChanged || tokenOutChanged || amountInChanged) {
+      // Reset confirmation when form changes
+      setShowConfirmation(false);
+      setSwapHash(null);
+      swapDetailsRef.current = null;
+      hasShownConfirmationRef.current = false;
+    }
+
+    // Update refs for next comparison
+    prevTokenInRef.current = tokenIn;
+    prevTokenOutRef.current = tokenOut;
+    prevAmountInRef.current = amountIn;
+  }, [tokenIn, tokenOut, amountIn, showConfirmation]);
 
   const handleAmountChange = useCallback((value: string) => {
     // Only allow valid number input
@@ -195,19 +297,45 @@ export function SwapInterface() {
       </div>
 
       {/* Swap Confirmation Modal */}
-      {showConfirmation && swapHash && tokenIn && tokenOut && quote && (
-        <SwapConfirmation
-          tokenIn={tokenIn}
-          tokenOut={tokenOut}
-          amountIn={amountIn}
-          amountOut={quote.amountOut}
-          transactionHash={swapHash}
-          onClose={() => {
-            setShowConfirmation(false);
-            setSwapHash(null);
-          }}
-        />
-      )}
+      {(() => {
+        if (!showConfirmation || !swapHash) return null;
+        
+        // Use stored swap details if available, otherwise fallback to current form values
+        const details = swapDetailsRef.current || (tokenIn && tokenOut && amountIn && quote?.amountOut ? {
+          tokenIn,
+          tokenOut,
+          amountIn,
+          amountOut: quote.amountOut,
+        } : null);
+        
+        if (!details) {
+          console.warn('Cannot show confirmation: missing swap details', {
+            hasStoredDetails: !!swapDetailsRef.current,
+            hasFormValues: !!(tokenIn && tokenOut && amountIn && quote?.amountOut)
+          });
+          return null;
+        }
+        
+        console.log('Rendering confirmation modal with details:', details);
+        
+        return (
+          <SwapConfirmation
+            tokenIn={details.tokenIn}
+            tokenOut={details.tokenOut}
+            amountIn={details.amountIn}
+            amountOut={details.amountOut}
+            transactionHash={swapHash}
+            onClose={() => {
+              console.log('Closing confirmation modal');
+              setShowConfirmation(false);
+              setSwapHash(null);
+              swapDetailsRef.current = null;
+              hasShownConfirmationRef.current = false;
+              isProcessingSwapSuccessRef.current = false;
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
