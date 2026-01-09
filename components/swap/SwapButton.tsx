@@ -70,7 +70,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+        className="w-full py-4 bg-gray-200 dark:bg-uniswap-dark-600 text-gray-500 dark:text-gray-400 rounded-2xl font-semibold cursor-not-allowed"
       >
         Connect Wallet
       </button>
@@ -82,7 +82,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+        className="w-full py-4 bg-gray-200 dark:bg-uniswap-dark-600 text-gray-500 dark:text-gray-400 rounded-2xl font-semibold cursor-not-allowed"
       >
         Select Tokens
       </button>
@@ -94,7 +94,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+        className="w-full py-4 bg-gray-200 dark:bg-uniswap-dark-600 text-gray-500 dark:text-gray-400 rounded-2xl font-semibold cursor-not-allowed"
       >
         Enter Amount
       </button>
@@ -106,7 +106,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-4 bg-gray-200 dark:bg-uniswap-dark-600 text-gray-500 dark:text-gray-400 rounded-2xl font-semibold cursor-not-allowed flex items-center justify-center gap-2"
       >
         <Loader2 className="w-5 h-5 animate-spin" />
         Fetching Quote...
@@ -119,7 +119,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+        className="w-full py-4 bg-gray-200 dark:bg-uniswap-dark-600 text-gray-500 dark:text-gray-400 rounded-2xl font-semibold cursor-not-allowed"
       >
         No Route Found
       </button>
@@ -137,14 +137,14 @@ export function SwapButton({
         {needsApproval ? (
           <button
             onClick={approve}
-            className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+            className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold hover:from-primary-700 hover:to-primary-600 transition-all shadow-md hover:shadow-lg"
           >
             Approve {tokenIn.symbol}
           </button>
         ) : (
           <button
             onClick={executeSwap}
-            className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+            className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold hover:from-primary-700 hover:to-primary-600 transition-all shadow-md hover:shadow-lg"
           >
             Try Again
           </button>
@@ -158,7 +158,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
+        className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
       >
         <Loader2 className="w-5 h-5 animate-spin" />
         Preparing Swap...
@@ -171,7 +171,7 @@ export function SwapButton({
     return (
       <button
         onClick={approve}
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+        className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold hover:from-primary-700 hover:to-primary-600 transition-all shadow-md hover:shadow-lg"
       >
         Approve {tokenIn.symbol}
       </button>
@@ -183,7 +183,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
+        className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
       >
         <Loader2 className="w-5 h-5 animate-spin" />
         Confirm Approval in Wallet
@@ -196,7 +196,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
+        className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
       >
         <Loader2 className="w-5 h-5 animate-spin" />
         Approving... (Confirming)
@@ -209,7 +209,7 @@ export function SwapButton({
     return (
       <button
         onClick={executeSwap}
-        className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+        className="w-full py-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-2xl font-semibold hover:from-green-700 hover:to-green-600 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
       >
         <CheckCircle2 className="w-5 h-5" />
         Approval Confirmed - Swap Now
@@ -222,7 +222,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
+        className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
       >
         <Loader2 className="w-5 h-5 animate-spin" />
         Confirm Swap in Wallet
@@ -235,7 +235,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
+        className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold cursor-not-allowed opacity-75 flex items-center justify-center gap-2"
       >
         <Loader2 className="w-5 h-5 animate-spin" />
         Swapping... (Confirming)
@@ -248,7 +248,7 @@ export function SwapButton({
     return (
       <button
         disabled
-        className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-2xl font-semibold cursor-not-allowed flex items-center justify-center gap-2"
       >
         <CheckCircle2 className="w-5 h-5" />
         Swap Confirmed!
@@ -292,7 +292,7 @@ export function SwapButton({
       )}
       <button
         onClick={executeSwap}
-        className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+        className="w-full py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold hover:from-primary-700 hover:to-primary-600 transition-all shadow-md hover:shadow-lg"
       >
         Swap
       </button>

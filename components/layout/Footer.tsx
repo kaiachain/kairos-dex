@@ -11,7 +11,7 @@ import { formatAddress } from '@/lib/utils';
 
 export function Footer() {
   return (
-    <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 mt-auto">
+    <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-uniswap-dark mt-auto">
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>

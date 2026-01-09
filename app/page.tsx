@@ -4,14 +4,8 @@ import { Layout } from '@/components/layout/Layout';
 export default function Home() {
   return (
     <Layout>
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="w-full max-w-2xl">
-          <h1 className="text-4xl font-bold text-center mb-8">
-            Uniswap V3 DEX
-          </h1>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-            Kairos Testnet
-          </p>
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4 bg-gradient-to-b from-gray-50 to-white dark:from-uniswap-dark dark:to-uniswap-dark-800">
+        <div className="w-full max-w-[420px]">
           <SwapInterface />
         </div>
       </div>

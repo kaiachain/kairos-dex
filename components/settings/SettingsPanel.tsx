@@ -6,7 +6,7 @@ export function SettingsPanel() {
   const [slippage, setSlippage] = useState(0.5);
   const [deadline, setDeadline] = useState(20);
   const [expertMode, setExpertMode] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   useEffect(() => {
     // Load settings from localStorage
@@ -18,7 +18,20 @@ export function SettingsPanel() {
     if (savedSlippage) setSlippage(parseFloat(savedSlippage));
     if (savedDeadline) setDeadline(parseInt(savedDeadline));
     if (savedExpertMode) setExpertMode(savedExpertMode === 'true');
-    if (savedTheme) setTheme(savedTheme as 'light' | 'dark');
+    if (savedTheme) {
+      setTheme(savedTheme as 'light' | 'dark');
+      // Apply theme immediately
+      const root = document.documentElement;
+      if (savedTheme === 'dark') {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    } else {
+      // Default to dark mode
+      const root = document.documentElement;
+      root.classList.add('dark');
+    }
   }, []);
 
   const saveSettings = () => {
@@ -26,11 +39,32 @@ export function SettingsPanel() {
     localStorage.setItem('deadline', deadline.toString());
     localStorage.setItem('expertMode', expertMode.toString());
     localStorage.setItem('theme', theme);
+    
+    // Apply theme immediately
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    
     alert('Settings saved!');
   };
 
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+    // Apply theme immediately without saving
+    const root = document.documentElement;
+    if (newTheme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('theme', newTheme);
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 space-y-6">
+    <div className="bg-white dark:bg-uniswap-dark-800 rounded-2xl shadow-uniswap-lg p-6 border border-gray-200 dark:border-gray-700 space-y-6">
       <div>
         <h3 className="text-lg font-semibold mb-4">Transaction Settings</h3>
         <div className="space-y-4">
@@ -45,7 +79,7 @@ export function SettingsPanel() {
               min="0"
               max="50"
               step="0.1"
-              className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+              className="w-full px-4 py-2 bg-gray-100 dark:bg-uniswap-dark-700 rounded-xl border border-gray-200 dark:border-gray-600 outline-none focus:border-primary-400 dark:focus:border-primary-600 transition-colors"
             />
           </div>
 
@@ -59,7 +93,7 @@ export function SettingsPanel() {
               onChange={(e) => setDeadline(parseInt(e.target.value) || 20)}
               min="1"
               max="60"
-              className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+              className="w-full px-4 py-2 bg-gray-100 dark:bg-uniswap-dark-700 rounded-xl border border-gray-200 dark:border-gray-600 outline-none focus:border-primary-400 dark:focus:border-primary-600 transition-colors"
             />
           </div>
 
@@ -92,8 +126,8 @@ export function SettingsPanel() {
           <label className="block text-sm font-medium mb-2">Theme</label>
           <select
             value={theme}
-            onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
-            className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+            onChange={(e) => handleThemeChange(e.target.value as 'light' | 'dark')}
+            className="w-full px-4 py-2 bg-gray-100 dark:bg-uniswap-dark-700 rounded-xl border border-gray-200 dark:border-gray-600 outline-none focus:border-primary-400 dark:focus:border-primary-600 transition-colors"
           >
             <option value="light">Light</option>
             <option value="dark">Dark</option>
@@ -103,7 +137,7 @@ export function SettingsPanel() {
 
       <button
         onClick={saveSettings}
-        className="w-full py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+        className="w-full py-3 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold hover:from-primary-700 hover:to-primary-600 transition-all shadow-md hover:shadow-lg"
       >
         Save Settings
       </button>

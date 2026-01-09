@@ -26,10 +26,10 @@ export function SwapConfirmation({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-uniswap-dark-800 rounded-3xl shadow-uniswap-lg max-w-md w-full p-6 border border-gray-200 dark:border-gray-700">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold">Swap Successful</h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Swap Successful</h3>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -48,25 +48,25 @@ export function SwapConfirmation({
 
         {/* Swap Details */}
         <div className="space-y-4 mb-6">
-          <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+          <div className="bg-gray-50 dark:bg-uniswap-dark-700 rounded-2xl p-4 border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">You paid</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{formatBalance(amountIn, 6)}</span>
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">{formatBalance(amountIn, 6)}</span>
               <span className="text-lg text-gray-600 dark:text-gray-400">{tokenIn.symbol}</span>
             </div>
           </div>
 
           <div className="flex justify-center -my-2">
-            <div className="bg-gray-200 dark:bg-gray-700 rounded-full p-1">
+            <div className="bg-gray-200 dark:bg-uniswap-dark-600 rounded-full p-1.5">
               <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
           </div>
 
-          <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+          <div className="bg-gray-50 dark:bg-uniswap-dark-700 rounded-2xl p-4 border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">You received</span>
             </div>
@@ -80,7 +80,7 @@ export function SwapConfirmation({
         </div>
 
         {/* Transaction Link */}
-        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
+        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-uniswap-dark-700 rounded-xl border border-gray-200 dark:border-gray-700/50 mb-6">
           <span className="text-sm text-gray-600 dark:text-gray-400">Transaction</span>
           <a
             href={explorerUrl}
@@ -98,7 +98,7 @@ export function SwapConfirmation({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+          className="w-full py-3 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-2xl font-semibold hover:from-primary-700 hover:to-primary-600 transition-all shadow-md hover:shadow-lg"
         >
           Close
         </button>

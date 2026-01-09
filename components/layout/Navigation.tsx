@@ -18,7 +18,7 @@ export function Navigation() {
   const pathname = usePathname();
 
   return (
-    <nav className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+    <nav className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-uniswap-dark">
       <div className="container mx-auto px-4">
         <div className="flex space-x-1">
           {navItems.map((item) => {
@@ -29,12 +29,15 @@ export function Navigation() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-colors',
+                  'flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-all relative',
                   isActive
-                    ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
+                    ? 'text-primary-600 dark:text-primary-400'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                 )}
               >
+                {isActive && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-500 to-primary-600 rounded-t-full" />
+                )}
                 <Icon className="w-4 h-4" />
                 <span>{item.label}</span>
               </Link>

@@ -45,10 +45,10 @@ export function TokenSelector({
       <button
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg transition-colors min-w-[120px] ${
+        className={`flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-uniswap-dark-600 rounded-xl border border-gray-200 dark:border-gray-700 transition-all min-w-[120px] font-medium ${
           disabled 
             ? 'opacity-50 cursor-not-allowed' 
-            : 'hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer'
+            : 'hover:bg-gray-50 dark:hover:bg-uniswap-dark-500 hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer shadow-sm hover:shadow-md'
         }`}
       >
         {selectedToken ? (
@@ -70,10 +70,10 @@ export function TokenSelector({
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-[500px] flex flex-col">
+          <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-uniswap-dark-800 rounded-2xl shadow-uniswap-lg border border-gray-200 dark:border-gray-700 z-50 max-h-[500px] flex flex-col">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Select a token</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Select a token</h3>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
@@ -88,7 +88,7 @@ export function TokenSelector({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search name or paste address"
-                  className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-100 dark:bg-uniswap-dark-700 rounded-xl border border-gray-200 dark:border-gray-600 outline-none focus:border-primary-400 dark:focus:border-primary-600 transition-colors"
                 />
               </div>
             </div>
@@ -104,7 +104,7 @@ export function TokenSelector({
                     <button
                       key={token.address}
                       onClick={() => handleSelect(token)}
-                      className="w-full flex items-center space-x-3 p-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      className="w-full flex items-center space-x-3 p-3 hover:bg-gray-100 dark:hover:bg-uniswap-dark-700 rounded-xl transition-colors"
                     >
                       <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center">
                         {token.symbol[0]}
@@ -132,7 +132,7 @@ export function TokenSelector({
                     // This would typically call a function to import the token
                   }
                 }}
-                className="w-full text-primary-600 dark:text-primary-400 hover:underline text-sm"
+                className="w-full text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium transition-colors"
               >
                 Import token by address
               </button>

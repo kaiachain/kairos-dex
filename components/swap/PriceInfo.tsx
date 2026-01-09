@@ -73,7 +73,7 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
   const slippageInsufficient = priceImpact > slippage * 0.8; // Warn if price impact is >80% of slippage
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-3 text-sm">
+    <div className="bg-gray-50 dark:bg-uniswap-dark-700 rounded-xl p-4 space-y-3 text-sm border border-gray-200 dark:border-gray-700/50">
       {/* Route Display */}
       {quote.route && quote.route.length > 0 && (
         <RouteDisplay

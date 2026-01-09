@@ -28,7 +28,7 @@ export function SwapSettings({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+        className="p-2 hover:bg-gray-100 dark:hover:bg-uniswap-dark-700 rounded-xl transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
       >
         <Settings className="w-5 h-5" />
       </button>
@@ -39,8 +39,8 @@ export function SwapSettings({
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 p-4">
-            <h3 className="font-semibold mb-4">Transaction Settings</h3>
+          <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-uniswap-dark-800 rounded-2xl shadow-uniswap-lg border border-gray-200 dark:border-gray-700 z-50 p-5">
+            <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Transaction Settings</h3>
 
             <div className="space-y-4">
               <div>
@@ -52,10 +52,10 @@ export function SwapSettings({
                     <button
                       key={preset}
                       onClick={() => onSlippageChange(preset)}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                         slippage === preset
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          ? 'bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-uniswap-dark-700 hover:bg-gray-200 dark:hover:bg-uniswap-dark-600 text-gray-700 dark:text-gray-300'
                       }`}
                     >
                       {preset}%
@@ -69,7 +69,7 @@ export function SwapSettings({
                   min="0"
                   max="50"
                   step="0.1"
-                  className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+                  className="w-full px-3 py-2 bg-gray-100 dark:bg-uniswap-dark-700 rounded-xl border border-gray-200 dark:border-gray-600 outline-none focus:border-primary-400 dark:focus:border-primary-600 transition-colors"
                   placeholder="Custom"
                 />
                 {slippage > 5 && (
@@ -90,7 +90,7 @@ export function SwapSettings({
                     onChange={(e) => onDeadlineChange(parseInt(e.target.value) || 20)}
                     min="1"
                     max="60"
-                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+                    className="w-full px-3 py-2 bg-gray-100 dark:bg-uniswap-dark-700 rounded-xl border border-gray-200 dark:border-gray-600 outline-none focus:border-primary-400 dark:focus:border-primary-600 transition-colors"
                   />
                   <span className="text-sm text-gray-600 dark:text-gray-400">minutes</span>
                 </div>
@@ -100,8 +100,8 @@ export function SwapSettings({
                 <label className="text-sm font-medium">Expert Mode</label>
                 <button
                   onClick={() => onExpertModeChange(!expertMode)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    expertMode ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+                  className={`relative w-12 h-6 rounded-full transition-all ${
+                    expertMode ? 'bg-gradient-to-r from-primary-600 to-primary-500' : 'bg-gray-300 dark:bg-uniswap-dark-600'
                   }`}
                 >
                   <div
