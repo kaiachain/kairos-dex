@@ -5,7 +5,6 @@ import {
   CONTRACT_SWAP_ROUTER_02,
   CONTRACT_NONFUNGIBLE_POSITION_MANAGER,
   CHAIN_NAME,
-  APP_NAME,
   BLOCK_EXPLORER_URL,
 } from '@/config/env';
 import { formatAddress } from '@/lib/utils';
@@ -85,11 +84,11 @@ function BrandSection() {
           />
         </div>
         <h3 className="text-base font-bold text-text-primary">
-          {APP_NAME}
+          Kairos DEX
         </h3>
       </div>
       <p className="text-xs text-text-secondary">
-        Decentralized exchange protocol on {CHAIN_NAME}
+        Powered by Uniswap V3 protocol on {CHAIN_NAME}
       </p>
     </div>
   );
