@@ -49,20 +49,20 @@ export function PositionCard({
 
   return (
     <Link href={`/positions/${position.tokenId}`}>
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow cursor-pointer">
+      <div className="bg-white dark:bg-card rounded-xl p-6 border border-border hover:shadow-lg transition-shadow cursor-pointer">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+            <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold text-sm">
               {position.token0.symbol[0]}
             </div>
-            <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-red-500 rounded-full flex items-center justify-center text-white font-bold text-sm -ml-3 border-2 border-white dark:border-gray-800">
+            <div className="w-10 h-10 bg-primary/30 rounded-full flex items-center justify-center text-primary font-bold text-sm -ml-3 border-2 border-white dark:border-card">
               {position.token1.symbol[0]}
             </div>
             <div>
-              <div className="font-semibold text-lg">
+              <div className="font-semibold text-lg text-text-primary">
                 {position.token0.symbol} / {position.token1.symbol}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="text-xs text-text-secondary">
                 {position.feeTier}% fee
               </div>
             </div>
@@ -70,8 +70,8 @@ export function PositionCard({
           <div
             className={`px-3 py-1 rounded-full text-xs font-medium ${
               isInRange
-                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                ? "bg-success/20 text-success"
+                : "bg-secondary/20 text-secondary"
             }`}
           >
             {isInRange ? "In Range" : "Out of Range"}
@@ -80,34 +80,34 @@ export function PositionCard({
 
         <div className="space-y-3 text-sm">
           <div className="flex justify-between items-center">
-            <span className="text-gray-600 dark:text-gray-400">
+            <span className="text-text-secondary">
               Position Value
             </span>
-            <span className="font-semibold text-lg">
+            <span className="font-semibold text-lg text-text-primary">
               {formatCurrency(position.value)}
             </span>
           </div>
 
           {position.token0Amount !== undefined &&
             position.token1Amount !== undefined && (
-              <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <div className="pt-2 border-t border-border">
+                <div className="text-xs text-text-secondary mb-1">
                   Token Amounts
                 </div>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-text-secondary">
                       {position.token0.symbol}:
                     </span>
-                    <span className="font-medium">
+                    <span className="font-medium text-text-primary">
                       {formatBalance(position.token0Amount, 4)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-text-secondary">
                       {position.token1.symbol}:
                     </span>
-                    <span className="font-medium">
+                    <span className="font-medium text-text-primary">
                       {formatBalance(position.token1Amount, 4)}
                     </span>
                   </div>
@@ -115,13 +115,13 @@ export function PositionCard({
               </div>
             )}
 
-          <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-            <span className="text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between pt-2 border-t border-border">
+            <span className="text-text-secondary">
               Price Range
             </span>
-            <span className="font-semibold text-xs">
+            <span className="font-semibold text-xs text-text-primary">
               {isFullRange ? (
-                <span className="text-gray-500">Full Range</span>
+                <span className="text-text-secondary">Full Range</span>
               ) : (
                 <>
                   {position.priceMin === 0
@@ -137,8 +137,8 @@ export function PositionCard({
           </div>
 
           {(mintCount > 0 || burnCount > 0 || collectCount > 0) && (
-            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+            <div className="pt-2 border-t border-border">
+              <div className="flex items-center gap-4 text-xs text-text-secondary">
                 {mintCount > 0 && (
                   <div className="flex items-center gap-1">
                     <Plus className="w-3 h-3" />
@@ -168,12 +168,12 @@ export function PositionCard({
           )}
 
           {position.uncollectedFees > 0 && (
-            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="pt-2 border-t border-border">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">
+                <span className="text-text-secondary">
                   Uncollected Fees
                 </span>
-                <span className="font-semibold text-green-600 dark:text-green-400">
+                <span className="font-semibold text-success">
                   {formatCurrency(position.uncollectedFees)}
                 </span>
               </div>

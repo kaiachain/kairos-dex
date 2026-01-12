@@ -115,12 +115,12 @@ export function WrapInterface() {
   const isLoadingBalance = isWrapping ? isLoadingNative : isLoadingWkaia;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-card rounded-2xl shadow-lg p-6 border border-border">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Wrap / Unwrap</h2>
+        <h2 className="text-2xl font-bold text-text-primary">Wrap / Unwrap</h2>
         <button
           onClick={handleToggle}
-          className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          className="px-4 py-2 text-sm bg-gray-100 dark:bg-input-bg rounded-lg hover:bg-gray-200 dark:hover:bg-bg transition-colors text-text-primary"
         >
           {isWrapping ? 'Switch to Unwrap' : 'Switch to Wrap'}
         </button>
@@ -128,15 +128,15 @@ export function WrapInterface() {
 
       <div className="space-y-4">
         {/* From Token */}
-        <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-xl p-4 border border-border">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm text-gray-600 dark:text-gray-400">
+            <label className="text-sm text-text-secondary">
               {isWrapping ? 'From' : 'From'}
             </label>
             {currentBalance && (
               <button
                 onClick={handleMax}
-                className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                className="text-xs text-primary hover:opacity-80 hover:underline"
               >
                 Balance: {isLoadingBalance ? '...' : formatBalance(currentBalance, 2)}
               </button>
@@ -149,12 +149,12 @@ export function WrapInterface() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.0"
-                className="w-full text-2xl font-semibold bg-transparent border-none outline-none"
+                className="w-full text-2xl font-semibold bg-transparent border-none outline-none text-text-primary"
                 disabled={!isConnected}
               />
             </div>
-            <div className="px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <span className="text-lg font-medium">
+            <div className="px-4 py-2 bg-white dark:bg-card rounded-lg border border-border">
+              <span className="text-lg font-medium text-text-primary">
                 {isWrapping ? NATIVE_CURRENCY_SYMBOL : `W${NATIVE_CURRENCY_SYMBOL}`}
               </span>
             </div>
@@ -163,9 +163,9 @@ export function WrapInterface() {
 
         {/* Arrow */}
         <div className="flex justify-center">
-          <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">
+          <div className="p-2 bg-gray-100 dark:bg-input-bg rounded-full">
             <svg
-              className="w-5 h-5 text-gray-600 dark:text-gray-400"
+              className="w-5 h-5 text-text-secondary"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -181,16 +181,16 @@ export function WrapInterface() {
         </div>
 
         {/* To Token */}
-        <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-xl p-4 border border-border">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm text-gray-600 dark:text-gray-400">To</label>
+            <label className="text-sm text-text-secondary">To</label>
             {!isWrapping && nativeBalance && (
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-text-secondary">
                 Balance: {formatBalance(nativeBalance.formatted, 2)}
               </span>
             )}
             {isWrapping && wkaiaBalance && (
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-text-secondary">
                 Balance: {formatBalance(wkaiaBalance, 2)}
               </span>
             )}
@@ -202,11 +202,11 @@ export function WrapInterface() {
                 value={amount}
                 placeholder="0.0"
                 readOnly
-                className="w-full text-2xl font-semibold bg-transparent border-none outline-none text-gray-400"
+                className="w-full text-2xl font-semibold bg-transparent border-none outline-none text-text-secondary"
               />
             </div>
-            <div className="px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <span className="text-lg font-medium">
+            <div className="px-4 py-2 bg-white dark:bg-card rounded-lg border border-border">
+              <span className="text-lg font-medium text-text-primary">
                 {isWrapping ? `W${NATIVE_CURRENCY_SYMBOL}` : NATIVE_CURRENCY_SYMBOL}
               </span>
             </div>
@@ -214,8 +214,8 @@ export function WrapInterface() {
         </div>
 
         {/* Info Box */}
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
+        <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
+          <p className="text-sm text-text-primary">
             {isWrapping
               ? `Wrapping converts your native ${NATIVE_CURRENCY_SYMBOL} to W${NATIVE_CURRENCY_SYMBOL} (Wrapped ${NATIVE_CURRENCY_SYMBOL}) tokens, which can be used in Uniswap V3 pools and swaps.`
               : `Unwrapping converts your W${NATIVE_CURRENCY_SYMBOL} tokens back to native ${NATIVE_CURRENCY_SYMBOL}.`}
@@ -226,42 +226,42 @@ export function WrapInterface() {
         {!isConnected ? (
           <button
             disabled
-            className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+            className="w-full py-4 bg-secondary text-text-secondary rounded-xl font-semibold cursor-not-allowed"
           >
             Connect Wallet
           </button>
         ) : !amount || parseFloat(amount) <= 0 ? (
           <button
             disabled
-            className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+            className="w-full py-4 bg-secondary text-text-secondary rounded-xl font-semibold cursor-not-allowed"
           >
             Enter Amount
           </button>
         ) : isWrapping && nativeBalance && parseFloat(amount) > parseFloat(nativeBalance.formatted) ? (
           <button
             disabled
-            className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+            className="w-full py-4 bg-secondary text-text-secondary rounded-xl font-semibold cursor-not-allowed"
           >
             Insufficient Balance
           </button>
         ) : !isWrapping && wkaiaBalance && parseFloat(amount) > parseFloat(wkaiaBalance) ? (
           <button
             disabled
-            className="w-full py-4 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded-xl font-semibold cursor-not-allowed"
+            className="w-full py-4 bg-secondary text-text-secondary rounded-xl font-semibold cursor-not-allowed"
           >
             Insufficient Balance
           </button>
         ) : isLoading ? (
           <button
             disabled
-            className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold cursor-not-allowed opacity-50"
+            className="w-full py-4 bg-primary text-bg rounded-xl font-semibold cursor-not-allowed opacity-50"
           >
             {isWrapping ? 'Wrapping...' : 'Unwrapping...'}
           </button>
         ) : (
           <button
             onClick={isWrapping ? handleWrap : handleUnwrap}
-            className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+            className="w-full py-4 bg-primary text-bg rounded-xl font-semibold hover:opacity-90 transition-colors"
           >
             {isWrapping ? `Wrap ${NATIVE_CURRENCY_SYMBOL}` : `Unwrap W${NATIVE_CURRENCY_SYMBOL}`}
           </button>
@@ -269,15 +269,15 @@ export function WrapInterface() {
 
         {/* Error Messages */}
         {wrapError && (
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
-            <p className="text-sm text-red-800 dark:text-red-200">
+          <div className="bg-error/20 rounded-lg p-4 border border-error/40">
+            <p className="text-sm text-error">
               Error: {wrapError.message || 'Failed to wrap tokens'}
             </p>
           </div>
         )}
         {unwrapError && (
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
-            <p className="text-sm text-red-800 dark:text-red-200">
+          <div className="bg-error/20 rounded-lg p-4 border border-error/40">
+            <p className="text-sm text-error">
               Error: {unwrapError.message || 'Failed to unwrap tokens'}
             </p>
           </div>
@@ -285,15 +285,15 @@ export function WrapInterface() {
 
         {/* Success Messages */}
         {isWrapSuccess && (
-          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
-            <p className="text-sm text-green-800 dark:text-green-200">
+          <div className="bg-success/20 rounded-lg p-4 border border-success/40">
+            <p className="text-sm text-success">
               Successfully wrapped {amount} {NATIVE_CURRENCY_SYMBOL} to W{NATIVE_CURRENCY_SYMBOL}!
             </p>
           </div>
         )}
         {isUnwrapSuccess && (
-          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
-            <p className="text-sm text-green-800 dark:text-green-200">
+          <div className="bg-success/20 rounded-lg p-4 border border-success/40">
+            <p className="text-sm text-success">
               Successfully unwrapped {amount} W{NATIVE_CURRENCY_SYMBOL} to {NATIVE_CURRENCY_SYMBOL}!
             </p>
           </div>

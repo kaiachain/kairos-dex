@@ -8,7 +8,7 @@ export function AnalyticsDashboard() {
   const { stats, isLoading } = useProtocolStats();
 
   if (isLoading) {
-    return <div className="text-center py-12 text-gray-500">Loading analytics...</div>;
+    return <div className="text-center py-12 text-text-secondary">Loading analytics...</div>;
   }
 
   return (
@@ -38,24 +38,24 @@ export function AnalyticsDashboard() {
         />
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-bold mb-4">Protocol Overview</h2>
+      <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
+        <h2 className="text-xl font-bold mb-4 text-text-primary">Protocol Overview</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
-            <div className="text-gray-600 dark:text-gray-400 mb-1">7d Volume</div>
-            <div className="font-semibold">{formatCurrency(stats.volume7d)}</div>
+            <div className="text-text-secondary mb-1">7d Volume</div>
+            <div className="font-semibold text-text-primary">{formatCurrency(stats.volume7d)}</div>
           </div>
           <div>
-            <div className="text-gray-600 dark:text-gray-400 mb-1">30d Volume</div>
-            <div className="font-semibold">{formatCurrency(stats.volume30d)}</div>
+            <div className="text-text-secondary mb-1">30d Volume</div>
+            <div className="font-semibold text-text-primary">{formatCurrency(stats.volume30d)}</div>
           </div>
           <div>
-            <div className="text-gray-600 dark:text-gray-400 mb-1">Total Positions</div>
-            <div className="font-semibold">{stats.totalPositions}</div>
+            <div className="text-text-secondary mb-1">Total Positions</div>
+            <div className="font-semibold text-text-primary">{stats.totalPositions}</div>
           </div>
           <div>
-            <div className="text-gray-600 dark:text-gray-400 mb-1">Total Fees</div>
-            <div className="font-semibold">{formatCurrency(stats.totalFees)}</div>
+            <div className="text-text-secondary mb-1">Total Fees</div>
+            <div className="font-semibold text-text-primary">{formatCurrency(stats.totalFees)}</div>
           </div>
         </div>
       </div>
@@ -75,15 +75,15 @@ function StatCard({
   change?: number;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
       <div className="flex items-center justify-between mb-2">
-        <div className="p-2 bg-primary-100 dark:bg-primary-900 rounded-lg">
-          <Icon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+        <div className="p-2 bg-primary/20 rounded-lg">
+          <Icon className="w-5 h-5 text-primary" />
         </div>
         {change !== undefined && (
           <span
             className={`text-sm font-medium ${
-              change >= 0 ? 'text-green-600' : 'text-red-600'
+              change >= 0 ? 'text-success' : 'text-error'
             }`}
           >
             {change >= 0 ? '+' : ''}
@@ -91,8 +91,8 @@ function StatCard({
           </span>
         )}
       </div>
-      <div className="text-2xl font-bold mb-1">{value}</div>
-      <div className="text-sm text-gray-600 dark:text-gray-400">{title}</div>
+      <div className="text-2xl font-bold mb-1 text-text-primary">{value}</div>
+      <div className="text-sm text-text-secondary">{title}</div>
     </div>
   );
 }

@@ -122,16 +122,16 @@ export function RouteDisplay({ route, tokenIn, tokenOut }: RouteDisplayProps) {
   const isMultiHop = hops > 1;
 
   return (
-    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+    <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+          <Info className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium text-text-primary">
             Route ({hops} {hops === 1 ? 'hop' : 'hops'})
           </span>
         </div>
         {isMultiHop && (
-          <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-800 px-2 py-0.5 rounded">
+          <span className="text-xs text-primary bg-primary/20 px-2 py-0.5 rounded">
             Multi-hop
           </span>
         )}
@@ -139,7 +139,7 @@ export function RouteDisplay({ route, tokenIn, tokenOut }: RouteDisplayProps) {
       
       <div className="flex items-center gap-2 flex-wrap">
         {isLoading ? (
-          <div className="text-sm text-blue-800 dark:text-blue-200">
+          <div className="text-sm text-text-secondary">
             Loading route...
           </div>
         ) : (
@@ -148,10 +148,10 @@ export function RouteDisplay({ route, tokenIn, tokenOut }: RouteDisplayProps) {
               <span
                 className={`text-sm font-medium px-2 py-1 rounded ${
                   index === 0
-                    ? 'bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100'
+                    ? 'bg-primary/20 text-primary'
                     : index === routeTokens.length - 1
-                    ? 'bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100'
-                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-white dark:bg-card text-text-primary'
                 }`}
               >
                 {token.isLoading ? (
@@ -161,7 +161,7 @@ export function RouteDisplay({ route, tokenIn, tokenOut }: RouteDisplayProps) {
                 )}
               </span>
               {index < routeTokens.length - 1 && (
-                <ArrowRight className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <ArrowRight className="w-4 h-4 text-primary" />
               )}
             </div>
           ))
@@ -169,7 +169,7 @@ export function RouteDisplay({ route, tokenIn, tokenOut }: RouteDisplayProps) {
       </div>
       
       {isMultiHop && (
-        <div className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+        <div className="mt-2 text-xs text-text-secondary">
           This swap will route through {hops - 1} intermediate token{hops - 1 > 1 ? 's' : ''} for optimal pricing.
         </div>
       )}

@@ -25,7 +25,7 @@ export function Navigation() {
   }, [pathname]);
 
   return (
-    <nav className="sticky top-16 z-40 border-b border-gray-200/50 dark:border-gray-800/50 bg-white/60 dark:bg-uniswap-dark/60 backdrop-blur-xl backdrop-saturate-150">
+    <nav className="sticky top-16 z-40 border-b border-border bg-white/60 dark:bg-bg/60 backdrop-blur-xl backdrop-saturate-150">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center justify-center space-x-1 py-2">
@@ -39,18 +39,18 @@ export function Navigation() {
                 className={cn(
                   'relative flex items-center space-x-2 px-5 py-3 text-sm font-medium transition-all duration-200 rounded-xl group',
                   isActive
-                    ? 'text-primary-600 dark:text-primary-400'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                    ? 'text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
                 )}
               >
                 {/* Active Background */}
                 {isActive && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary-50 via-primary-100/50 to-primary-50 dark:from-primary-900/30 dark:via-primary-800/20 dark:to-primary-900/30 rounded-xl border border-primary-200/50 dark:border-primary-700/30" />
+                  <div className="absolute inset-0 bg-primary/10 rounded-xl border border-primary/20" />
                 )}
                 
                 {/* Hover Background */}
                 {!isActive && (
-                  <div className="absolute inset-0 bg-gray-100/50 dark:bg-uniswap-dark-700/30 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute inset-0 bg-gray-100/50 dark:bg-card/30 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 )}
 
                 {/* Content */}
@@ -64,7 +64,7 @@ export function Navigation() {
 
                 {/* Active Indicator Dot */}
                 {isActive && (
-                  <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary-500 animate-pulse" />
+                  <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary animate-pulse" />
                 )}
               </Link>
             );
@@ -75,7 +75,7 @@ export function Navigation() {
         <div className="md:hidden">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="flex items-center justify-between w-full py-3 text-gray-700 dark:text-gray-300"
+            className="flex items-center justify-between w-full py-3 text-text-primary"
           >
             <span className="font-semibold text-sm">
               {navItems.find(item => 
@@ -102,14 +102,14 @@ export function Navigation() {
                     className={cn(
                       'flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200',
                       isActive
-                        ? 'bg-gradient-to-r from-primary-50 to-primary-100/50 dark:from-primary-900/30 dark:to-primary-800/20 text-primary-600 dark:text-primary-400 border border-primary-200/50 dark:border-primary-700/30'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-uniswap-dark-700/30'
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'text-text-primary hover:bg-gray-100/50 dark:hover:bg-card/30'
                     )}
                   >
                     <Icon className="w-5 h-5" />
                     <span className="font-medium">{item.label}</span>
                     {isActive && (
-                      <div className="ml-auto w-2 h-2 rounded-full bg-primary-500" />
+                      <div className="ml-auto w-2 h-2 rounded-full bg-primary" />
                     )}
                   </Link>
                 );

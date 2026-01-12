@@ -774,79 +774,79 @@ export function AddLiquidity({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 max-w-2xl">
-      <h2 className="text-2xl font-bold mb-6">Add Liquidity</h2>
+    <div className="bg-white dark:bg-card rounded-2xl shadow-lg p-6 border border-border max-w-2xl">
+      <h2 className="text-2xl font-bold mb-6 text-text-primary">Add Liquidity</h2>
 
       <div className="space-y-6">
         {/* Pool Selector - shown when coming from Positions page */}
         {showPoolSelector && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-2 text-text-primary">
                 Select a Pool
               </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-text-secondary mb-4">
                 Choose a pool to add liquidity to. The tokens and fee tier will be automatically populated.
               </p>
               
               {/* Search input */}
               <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-secondary" />
                 <input
                   type="text"
                   value={poolSearchQuery}
                   onChange={(e) => setPoolSearchQuery(e.target.value)}
                   placeholder="Search pools by token name or address"
-                  className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-input-bg rounded-lg border border-border outline-none focus:border-primary text-text-primary"
                 />
               </div>
 
               {/* Pool list */}
               {isLoadingPools ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-text-secondary">
                   Loading pools...
                 </div>
               ) : filteredPools.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-text-secondary">
                   {poolSearchQuery ? "No pools found matching your search" : "No pools available"}
                 </div>
               ) : (
-                <div className="max-h-96 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                <div className="max-h-96 overflow-y-auto space-y-2 border border-border rounded-lg p-2">
                   {filteredPools.map((pool) => (
                     <button
                       key={pool.address}
                       onClick={() => setSelectedPool(pool)}
-                      className="w-full text-left p-4 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors border border-transparent hover:border-primary-300 dark:hover:border-primary-700"
+                      className="w-full text-left p-4 bg-gray-50 dark:bg-input-bg hover:bg-gray-100 dark:hover:bg-bg rounded-lg transition-colors border border-transparent hover:border-primary"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <div className="flex -space-x-2">
-                            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-xs font-semibold">
+                            <div className="w-8 h-8 bg-gray-200 dark:bg-bg rounded-full flex items-center justify-center text-xs font-semibold text-text-primary">
                               {pool.token0.symbol[0]}
                             </div>
-                            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-xs font-semibold">
+                            <div className="w-8 h-8 bg-gray-200 dark:bg-bg rounded-full flex items-center justify-center text-xs font-semibold text-text-primary">
                               {pool.token1.symbol[0]}
                             </div>
                           </div>
                           <div>
-                            <div className="font-semibold">
+                            <div className="font-semibold text-text-primary">
                               {pool.token0.symbol} / {pool.token1.symbol}
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                            <div className="text-xs text-text-secondary">
                               Fee: {pool.feeTier}%
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-semibold">
+                          <div className="text-sm font-semibold text-text-primary">
                             {formatCurrency(pool.tvl)}
                           </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="text-xs text-text-secondary">
                             TVL
                           </div>
                         </div>
                       </div>
-                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
+                      <div className="mt-2 text-xs text-text-secondary font-mono">
                         {formatAddress(pool.address, 6)}
                       </div>
                     </button>
@@ -859,13 +859,13 @@ export function AddLiquidity({
 
         {/* Show message when pool is selected */}
         {selectedPool && fromPositionsPage && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="bg-success/20 border border-success/40 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-800 dark:text-green-200 font-semibold mb-1">
+                <p className="text-success font-semibold mb-1">
                   ✓ Pool Selected
                 </p>
-                <p className="text-green-700 dark:text-green-300 text-sm">
+                <p className="text-text-primary text-sm">
                   {selectedPool.token0.symbol} / {selectedPool.token1.symbol} ({selectedPool.feeTier}% fee)
                 </p>
               </div>
@@ -877,7 +877,7 @@ export function AddLiquidity({
                   setAmount0("");
                   setAmount1("");
                 }}
-                className="text-sm text-green-700 dark:text-green-300 hover:underline"
+                className="text-sm text-primary hover:opacity-80 hover:underline"
               >
                 Change Pool
               </button>
@@ -886,9 +886,9 @@ export function AddLiquidity({
         )}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium">Token 0</label>
+            <label className="block text-sm font-medium text-text-primary">Token 0</label>
             {token0 && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-text-secondary">
                 {isLoadingBalance0
                   ? "Loading..."
                   : balance0
@@ -908,12 +908,12 @@ export function AddLiquidity({
                 }}
                 placeholder="0.0"
                 disabled={showPoolSelector}
-                className={`w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg outline-none ${
-                  errors.amount0 ? "border-2 border-red-500" : "border-none"
-                } ${showPoolSelector ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`w-full px-4 py-2 bg-gray-50 dark:bg-input-bg rounded-lg outline-none border ${
+                  errors.amount0 ? "border-2 border-error" : "border-border"
+                } ${showPoolSelector ? "opacity-50 cursor-not-allowed" : ""} text-text-primary`}
               />
               {errors.amount0 && (
-                <p className="text-red-500 text-xs mt-1">{errors.amount0}</p>
+                <p className="text-error text-xs mt-1">{errors.amount0}</p>
               )}
             </div>
             <TokenSelector
@@ -927,9 +927,9 @@ export function AddLiquidity({
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium">Token 1</label>
+            <label className="block text-sm font-medium text-text-primary">Token 1</label>
             {token1 && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-text-secondary">
                 {isLoadingBalance1
                   ? "Loading..."
                   : balance1
@@ -949,12 +949,12 @@ export function AddLiquidity({
                 }}
                 placeholder="0.0"
                 disabled={showPoolSelector}
-                className={`w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg outline-none ${
-                  errors.amount1 ? "border-2 border-red-500" : "border-none"
-                } ${showPoolSelector ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`w-full px-4 py-2 bg-gray-50 dark:bg-input-bg rounded-lg outline-none border ${
+                  errors.amount1 ? "border-2 border-error" : "border-border"
+                } ${showPoolSelector ? "opacity-50 cursor-not-allowed" : ""} text-text-primary`}
               />
               {errors.amount1 && (
-                <p className="text-red-500 text-xs mt-1">{errors.amount1}</p>
+                <p className="text-error text-xs mt-1">{errors.amount1}</p>
               )}
             </div>
             <TokenSelector
@@ -967,12 +967,12 @@ export function AddLiquidity({
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Fee Tier</label>
+          <label className="block text-sm font-medium mb-2 text-text-primary">Fee Tier</label>
           <select
             value={fee}
             onChange={(e) => setFee(parseInt(e.target.value))}
             disabled={disableTokenSelection || showPoolSelector || (fromPositionsPage && selectedPool !== null)}
-            className={`w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none ${
+            className={`w-full px-4 py-2 bg-gray-50 dark:bg-input-bg rounded-lg border border-border outline-none focus:border-primary text-text-primary ${
               disableTokenSelection || showPoolSelector || (fromPositionsPage && selectedPool !== null) ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
@@ -997,15 +997,15 @@ export function AddLiquidity({
 
         {/* First Liquidity Addition Warning */}
         {isFirstLiquidity && token0 && token1 && amount0 && amount1 && sqrtPriceX96 && currentTick !== null && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-            <p className="text-yellow-800 dark:text-yellow-200 font-semibold mb-2">
+          <div className="bg-secondary/20 border border-secondary/40 rounded-lg p-4">
+            <p className="text-secondary font-semibold mb-2">
               ⚠️ First Liquidity Addition
             </p>
-            <p className="text-yellow-700 dark:text-yellow-300 text-sm mb-2">
+            <p className="text-text-primary text-sm mb-2">
               This is the first liquidity addition to a newly initialized pool. The token amounts must match the current price ratio exactly, or the transaction will fail.
             </p>
             {currentTick !== null && (
-              <p className="text-yellow-600 dark:text-yellow-400 text-xs">
+              <p className="text-text-secondary text-xs">
                 Current tick: {currentTick} | The amounts will be automatically adjusted to match the current price when you click "Add Liquidity".
               </p>
             )}
@@ -1014,13 +1014,13 @@ export function AddLiquidity({
 
         {/* Error Display */}
         {showTxError && (mintError || isTxError) && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <p className="text-red-600 dark:text-red-400 text-sm">
+          <div className="bg-error/20 border border-error/40 rounded-lg p-4">
+            <p className="text-error text-sm">
               {mintError?.message ||
                 "Transaction failed. Please check your inputs and try again."}
             </p>
             {(mintError?.message?.includes("uint(9)") || mintError?.message?.includes("error code 9")) && (
-              <p className="text-red-600 dark:text-red-400 text-xs mt-2">
+              <p className="text-error text-xs mt-2">
                 <strong>Error Code 9:</strong> This usually means the token amounts don't match the current price ratio. For a newly initialized pool, amounts must match the initialization price exactly.
               </p>
             )}
@@ -1029,12 +1029,12 @@ export function AddLiquidity({
 
         {/* Info about token amounts and price range */}
         {!fullRange && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <p className="text-blue-600 dark:text-blue-400 text-sm mb-2">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+            <p className="text-text-primary text-sm mb-2">
               <strong>Note:</strong> Token amounts will be automatically adjusted to the optimal ratio for the selected price range. The contract will use the required amounts and refund any excess.
             </p>
             {calculatedPriceRange && calculatedPriceRange.min !== null && calculatedPriceRange.max !== null && (
-              <p className="text-blue-600 dark:text-blue-400 text-xs">
+              <p className="text-text-secondary text-xs">
                 The calculated price range may differ slightly from your entered range due to tick spacing requirements.
               </p>
             )}
@@ -1043,19 +1043,19 @@ export function AddLiquidity({
 
         {/* Pool Initialization Prompt */}
         {showInitPrompt && poolNeedsInitialization && (
-          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+          <div className="bg-secondary/20 border border-secondary/40 rounded-lg p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
-                <p className="text-orange-800 dark:text-orange-200 font-semibold mb-1">
+                <p className="text-secondary font-semibold mb-1">
                   ⚠️ Pool Not Initialized
                 </p>
-                <p className="text-orange-700 dark:text-orange-300 text-sm mb-3">
+                <p className="text-text-primary text-sm mb-3">
                   This pool exists but hasn&apos;t been initialized with a
                   starting price. You must initialize it before adding
                   liquidity.
                 </p>
                 {poolAddress && (
-                  <p className="text-orange-600 dark:text-orange-400 text-xs mb-3 break-all">
+                  <p className="text-text-secondary text-xs mb-3 break-all">
                     Pool: {poolAddress}
                   </p>
                 )}
@@ -1064,7 +1064,7 @@ export function AddLiquidity({
 
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   Initial Price ({token1?.symbol} per {token0?.symbol})
                 </label>
                 <input
@@ -1072,17 +1072,17 @@ export function AddLiquidity({
                   value={initialPrice}
                   onChange={(e) => setInitialPrice(e.target.value)}
                   placeholder="1.0"
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-700 border border-orange-300 dark:border-orange-700 rounded-lg outline-none text-sm"
+                  className="w-full px-4 py-2 bg-white dark:bg-input-bg border border-border rounded-lg outline-none focus:border-primary text-sm text-text-primary"
                 />
-                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                <p className="text-xs text-text-secondary mt-1">
                   Set the initial price for this pool (e.g., 1.5 means 1{" "}
                   {token1?.symbol} = 1.5 {token0?.symbol})
                 </p>
               </div>
 
               {(initWriteError || initTxError) && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                  <p className="text-red-600 dark:text-red-400 text-xs">
+                <div className="bg-error/20 border border-error/40 rounded-lg p-3">
+                  <p className="text-error text-xs">
                     {initWriteError?.message ||
                       initTxError?.message ||
                       "Failed to initialize pool"}
@@ -1091,8 +1091,8 @@ export function AddLiquidity({
               )}
 
               {isInitSuccess && (
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                  <p className="text-green-600 dark:text-green-400 text-xs font-semibold">
+                <div className="bg-success/20 border border-success/40 rounded-lg p-3">
+                  <p className="text-success text-xs font-semibold">
                     ✅ Pool initialized successfully! You can now add liquidity.
                   </p>
                 </div>
@@ -1107,13 +1107,13 @@ export function AddLiquidity({
                     parseFloat(initialPrice) <= 0 ||
                     isInitLoading
                   }
-                  className="flex-1 py-2 px-4 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="flex-1 py-2 px-4 bg-primary text-bg rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {isInitLoading ? "Initializing..." : "Initialize Pool"}
                 </button>
                 <button
                   onClick={() => setShowInitPrompt(false)}
-                  className="py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
+                  className="py-2 px-4 bg-gray-100 dark:bg-input-bg text-text-primary rounded-lg font-semibold hover:bg-gray-200 dark:hover:bg-bg transition-colors text-sm"
                 >
                   Cancel
                 </button>
@@ -1134,7 +1134,7 @@ export function AddLiquidity({
             isApproving ||
             poolNeedsInitialization
           }
-          className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-4 bg-primary text-bg rounded-xl font-semibold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isApproving
             ? "Approving..."

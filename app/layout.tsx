@@ -1,9 +1,23 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Manrope, Red_Hat_Display } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
-const inter = Inter({ subsets: ['latin'] });
+// Load Manrope font (primary font)
+const manrope = Manrope({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  variable: '--font-manrope',
+  display: 'swap',
+});
+
+// Load Red Hat Display font (for headings/special elements)
+const redHatDisplay = Red_Hat_Display({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-red-hat-display',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Uniswap V3 DEX - Kairos Testnet',
@@ -16,8 +30,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={inter.className}>
+    <html lang="en" className={`${manrope.variable} ${redHatDisplay.variable} dark`}>
+      <body className={manrope.className}>
         <Providers>{children}</Providers>
       </body>
     </html>

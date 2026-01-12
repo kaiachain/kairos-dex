@@ -9,49 +9,69 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // KAIA Theme Colors - using CSS variables for theme switching
+        bg: {
+          DEFAULT: 'var(--background)',
+          dark: '#111111',
+          light: '#f7f7f7',
+        },
         primary: {
-          50: '#fef2f2',
-          100: '#fee2e2',
-          200: '#fecaca',
-          300: '#fca5a5',
-          400: '#f87171',
-          500: '#ef4444',
-          600: '#dc2626',
-          700: '#b91c1c',
-          800: '#991b1b',
-          900: '#7f1d1d',
+          DEFAULT: 'var(--primary)',
+          dark: '#BFF009',
+          light: '#ACD808',
         },
-        // Uniswap-style pink colors
-        pink: {
-          50: '#fdf2f8',
-          100: '#fce7f3',
-          200: '#fbcfe8',
-          300: '#f9a8d4',
-          400: '#f472b6',
-          500: '#ec4899',
-          600: '#db2777',
-          700: '#be185d',
-          800: '#9f1239',
-          900: '#831843',
+        text: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          'primary-dark': '#ffffff',
+          'secondary-dark': '#AFAFAF',
+          'primary-light': '#040404',
+          'secondary-light': '#4C4C4C',
         },
-        // Uniswap-style colors
-        uniswap: {
-          purple: '#8b5cf6',
-          blue: '#2172E5',
-          pink: '#FC72FF',
-          dark: '#0D1117',
-          'dark-800': '#161B22',
-          'dark-700': '#21262D',
-          'dark-600': '#30363D',
+        error: {
+          DEFAULT: 'var(--error)',
+          dark: '#E85B56',
+          light: '#EB807A',
         },
+        success: {
+          DEFAULT: 'var(--success)',
+          dark: '#40AB2B',
+          light: '#57CF3F',
+        },
+        secondary: {
+          DEFAULT: 'var(--secondary)',
+          dark: '#667085',
+          light: '#9e9e9e',
+        },
+        input: {
+          bg: 'var(--input-bg)',
+          text: 'var(--input-text)',
+          'bg-dark': '#040404',
+          'bg-light': '#ffffff',
+        },
+        toast: {
+          bg: '#1f5214',
+          border: '#40ab2b40',
+        },
+        // Card/Container backgrounds
+        card: {
+          DEFAULT: 'var(--card-bg)',
+        },
+        border: {
+          DEFAULT: 'var(--border-color)',
+        },
+      },
+      fontFamily: {
+        sans: ['Manrope', 'sans-serif'],
+        display: ['Red Hat Display', 'RedHatDisplay', 'sans-serif'],
       },
       borderRadius: {
         '2xl': '1rem',
         '3xl': '1.5rem',
+        toast: '16px',
       },
       boxShadow: {
-        'uniswap': '0 4px 12px rgba(0, 0, 0, 0.15)',
-        'uniswap-lg': '0 8px 24px rgba(0, 0, 0, 0.2)',
+        toast: '0px 8px 16px rgba(87, 207, 63, 0.251)',
       },
     },
   },

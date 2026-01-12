@@ -37,21 +37,21 @@ export function PoolExplorer() {
     <div className="space-y-6">
       <div className="flex items-center space-x-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-secondary" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search pools by token name or address"
-            className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-input-bg rounded-lg border border-border outline-none focus:border-primary text-text-primary"
           />
         </div>
         <div className="flex items-center space-x-2">
-          <Filter className="w-5 h-5 text-gray-400" />
+          <Filter className="w-5 h-5 text-text-secondary" />
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+            className="px-4 py-2 bg-gray-50 dark:bg-input-bg rounded-lg border border-border outline-none focus:border-primary text-text-primary"
           >
             <option value="tvl">Sort by TVL</option>
             <option value="volume">Sort by Volume</option>
@@ -61,9 +61,9 @@ export function PoolExplorer() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">Loading pools...</div>
+        <div className="text-center py-12 text-text-secondary">Loading pools...</div>
       ) : sortedPools.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">No pools found</div>
+        <div className="text-center py-12 text-text-secondary">No pools found</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedPools.map((pool) => (

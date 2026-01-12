@@ -12,10 +12,10 @@ export default function PoolsPage() {
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Pools</h1>
+          <h1 className="text-3xl font-bold text-text-primary">Pools</h1>
           <button
             onClick={() => setShowCreatePool(!showCreatePool)}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="px-6 py-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-colors"
           >
             {showCreatePool ? 'Browse Pools' : 'Create Pool'}
           </button>

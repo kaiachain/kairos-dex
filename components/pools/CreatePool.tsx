@@ -247,12 +247,12 @@ export function CreatePool() {
   const isFullySuccess = isSuccess && isInitSuccess;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 max-w-2xl">
-      <h2 className="text-2xl font-bold mb-6">Create Pool</h2>
+    <div className="bg-white dark:bg-card rounded-2xl shadow-lg p-6 border border-border max-w-2xl">
+      <h2 className="text-2xl font-bold mb-6 text-text-primary">Create Pool</h2>
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-medium mb-2">Token 0</label>
+          <label className="block text-sm font-medium mb-2 text-text-primary">Token 0</label>
           <TokenSelector
             selectedToken={token0}
             onTokenSelect={setToken0}
@@ -261,7 +261,7 @@ export function CreatePool() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Token 1</label>
+          <label className="block text-sm font-medium mb-2 text-text-primary">Token 1</label>
           <TokenSelector
             selectedToken={token1}
             onTokenSelect={setToken1}
@@ -270,7 +270,7 @@ export function CreatePool() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Fee Tier</label>
+          <label className="block text-sm font-medium mb-2 text-text-primary">Fee Tier</label>
           <div className="grid grid-cols-4 gap-2">
             {FEE_TIERS.map((tier) => (
               <button
@@ -278,19 +278,19 @@ export function CreatePool() {
                 onClick={() => setFee(tier.value)}
                 className={`p-3 rounded-lg border transition-colors ${
                   fee === tier.value
-                    ? "bg-primary-600 text-white border-primary-600"
-                    : "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+                    ? "bg-primary text-bg border-primary"
+                    : "bg-gray-100 dark:bg-input-bg border-border"
                 }`}
               >
-                <div className="font-semibold">{tier.label}</div>
-                <div className="text-xs opacity-75">{tier.description}</div>
+                <div className="font-semibold text-text-primary">{tier.label}</div>
+                <div className="text-xs opacity-75 text-text-secondary">{tier.description}</div>
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium mb-2 text-text-primary">
             Initial Price ({token1?.symbol} per {token0?.symbol})
           </label>
           <input
@@ -298,33 +298,33 @@ export function CreatePool() {
             value={initialPrice}
             onChange={(e) => setInitialPrice(e.target.value)}
             placeholder="1.0"
-            className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+            className="w-full px-4 py-2 bg-gray-50 dark:bg-input-bg rounded-lg border border-border outline-none focus:border-primary text-text-primary"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-text-secondary mt-1">
             Set the initial price for this pool
           </p>
         </div>
 
         {!isConnected && (
-          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          <div className="p-4 bg-secondary/20 border border-secondary/40 rounded-lg">
+            <p className="text-sm text-text-primary">
               Please connect your wallet to create a pool.
             </p>
           </div>
         )}
 
         {displayError && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-800 dark:text-red-200 font-semibold mb-1">
+          <div className="p-4 bg-error/20 border border-error/40 rounded-lg">
+            <p className="text-sm text-error font-semibold mb-1">
               Transaction Failed
             </p>
-            <p className="text-xs text-red-700 dark:text-red-300">
+            <p className="text-xs text-error">
               {writeError?.message ||
                 txError?.message ||
                 "Unknown error occurred"}
             </p>
             {writeError?.message?.includes("reverted") && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+              <p className="text-xs text-error mt-2">
                 Common causes: Invalid token addresses, pool already exists, or
                 insufficient gas.
               </p>
@@ -333,12 +333,12 @@ export function CreatePool() {
         )}
 
         {isSuccess && !isInitSuccess && (
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-800 dark:text-blue-200 font-semibold mb-1">
+          <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+            <p className="text-sm text-text-primary font-semibold mb-1">
               Pool Created! Initializing...
             </p>
             {hash && (
-              <p className="text-xs text-blue-700 dark:text-blue-300">
+              <p className="text-xs text-text-secondary">
                 Create TX: {hash.slice(0, 10)}...{hash.slice(-8)}
               </p>
             )}
@@ -346,22 +346,22 @@ export function CreatePool() {
         )}
 
         {isFullySuccess && (
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <p className="text-sm text-green-800 dark:text-green-200 font-semibold mb-1">
+          <div className="p-4 bg-success/20 border border-success/40 rounded-lg">
+            <p className="text-sm text-success font-semibold mb-1">
               Pool Created and Initialized Successfully! 🎉
             </p>
             {poolAddress && (
-              <p className="text-xs text-green-700 dark:text-green-300 break-all">
+              <p className="text-xs text-text-primary break-all">
                 Pool Address: {poolAddress}
               </p>
             )}
             {hash && (
-              <p className="text-xs text-green-700 dark:text-green-300">
+              <p className="text-xs text-text-secondary">
                 Create TX: {hash.slice(0, 10)}...{hash.slice(-8)}
               </p>
             )}
             {initHash && (
-              <p className="text-xs text-green-700 dark:text-green-300">
+              <p className="text-xs text-text-secondary">
                 Init TX: {initHash.slice(0, 10)}...{initHash.slice(-8)}
               </p>
             )}
@@ -371,7 +371,7 @@ export function CreatePool() {
         <button
           onClick={handleCreatePool}
           disabled={isButtonDisabled}
-          className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-4 bg-primary text-bg rounded-xl font-semibold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isInitPending || isInitLoading
             ? "Initializing Pool..."

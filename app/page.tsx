@@ -16,7 +16,7 @@ export default function Home() {
         <div className="relative z-10 w-full max-w-[420px] space-y-8">
           {/* Hero Title */}
           <div className="text-center space-y-4">
-            <h1 className="text-5xl md:text-6xl font-bold text-white leading-tight">
+            <h1 className="text-5xl md:text-6xl font-bold text-text-primary leading-tight">
               Swap anytime, anywhere.
             </h1>
           </div>
@@ -27,7 +27,7 @@ export default function Home() {
           </div>
 
           {/* Subtitle */}
-          <p className="text-center text-gray-400 text-sm">
+          <p className="text-center text-text-secondary text-sm">
             Buy and sell crypto on 16+ networks including Ethereum, Unichain, and Base.
           </p>
         </div>

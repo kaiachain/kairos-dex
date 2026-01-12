@@ -14,7 +14,7 @@ export function PositionList() {
       <div>
         <button
           onClick={() => setShowAddLiquidity(false)}
-          className="mb-4 text-primary-600 dark:text-primary-400 hover:underline"
+          className="mb-4 text-primary hover:opacity-80 hover:underline"
         >
           ← Back to Positions
         </button>
@@ -27,11 +27,11 @@ export function PositionList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-text-secondary">
             {positions.length} position{positions.length !== 1 ? "s" : ""} found
           </p>
           {positions.length > 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm text-text-secondary mt-1">
               Total value:{" "}
               {positions
                 .reduce((sum, p) => sum + p.value, 0)
@@ -44,22 +44,22 @@ export function PositionList() {
         </div>
         <button
           onClick={() => setShowAddLiquidity(true)}
-          className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+          className="px-6 py-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-colors font-medium"
         >
           Create Position
         </button>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-text-secondary">
           Loading positions...
         </div>
       ) : positions.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 mb-4">No positions found</p>
+          <p className="text-text-secondary mb-4">No positions found</p>
           <button
             onClick={() => setShowAddLiquidity(true)}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="px-6 py-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-colors"
           >
             Create Your First Position
           </button>

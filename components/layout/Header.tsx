@@ -62,20 +62,20 @@ function ConnectWalletModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
       <div
         ref={modalRef}
-        className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in"
+        className="bg-white dark:bg-input-bg border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-scale-in"
       >
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold text-white">Connect Wallet</h2>
+            <h2 className="text-2xl font-semibold text-text-primary">Connect Wallet</h2>
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-bg transition-colors text-text-secondary hover:text-text-primary"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <p className="text-sm text-gray-400 mb-6">
+          <p className="text-sm text-text-secondary mb-6">
             Connect your wallet to continue. By connecting, you agree to our Terms of Service.
           </p>
 
@@ -87,32 +87,32 @@ function ConnectWalletModal({
                   connect({ connector });
                   onClose();
                 }}
-                className="w-full flex items-center space-x-4 px-4 py-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-all duration-200 border border-gray-700 hover:border-gray-600 group"
+                className="w-full flex items-center space-x-4 px-4 py-4 bg-gray-50 dark:bg-input-bg hover:bg-gray-100 dark:hover:bg-bg rounded-xl transition-all duration-200 border border-border hover:border-primary group"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-bg flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                   {getConnectorIcon(connector)}
                 </div>
                 <div className="flex-1 text-left">
-                  <div className="font-semibold text-white">{getConnectorName(connector)}</div>
-                  <div className="text-xs text-gray-400">
+                  <div className="font-semibold text-text-primary">{getConnectorName(connector)}</div>
+                  <div className="text-xs text-text-secondary">
                     {connector.name.toLowerCase().includes("metamask") && "Connect using MetaMask browser extension"}
                     {connector.name.toLowerCase().includes("walletconnect") && "Connect using WalletConnect"}
                     {connector.name.toLowerCase().includes("coinbase") && "Connect using Coinbase Wallet"}
                   </div>
                 </div>
-                <ChevronDown className="w-5 h-5 text-gray-400 rotate-[-90deg] group-hover:text-white transition-colors" />
+                <ChevronDown className="w-5 h-5 text-text-secondary rotate-[-90deg] group-hover:text-text-primary transition-colors" />
               </button>
             ))}
           </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-800">
-            <p className="text-xs text-gray-500 text-center">
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-text-secondary text-center">
               New to Ethereum?{" "}
               <a
                 href="https://ethereum.org/en/wallets/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-pink-500 hover:text-pink-400 underline"
+                className="text-primary hover:opacity-80 underline"
               >
                 Learn more about wallets
               </a>
@@ -177,15 +177,15 @@ export function Header() {
   const explorerUrl = `${BLOCK_EXPLORER_URL}/account/${address}`;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-800 bg-gray-900">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-bg">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">U</span>
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-bg font-bold text-sm">U</span>
             </div>
-            <span className="text-xl font-semibold text-white">Uniswap</span>
+            <span className="text-xl font-semibold text-text-primary">Uniswap</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -199,8 +199,8 @@ export function Header() {
                   className={cn(
                     "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive
-                      ? "text-white bg-gray-800"
-                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                      ? "text-text-primary bg-gray-100 dark:bg-input-bg"
+                      : "text-text-secondary hover:text-text-primary hover:bg-gray-100 dark:hover:bg-input-bg"
                   )}
                 >
                   {item.label}
@@ -214,12 +214,12 @@ export function Header() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-800 transition-colors"
+              className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-input-bg transition-colors"
             >
               {mobileMenuOpen ? (
-                <X className="w-5 h-5 text-gray-400" />
+                <X className="w-5 h-5 text-text-secondary" />
               ) : (
-                <Menu className="w-5 h-5 text-gray-400" />
+                <Menu className="w-5 h-5 text-text-secondary" />
               )}
             </button>
 
@@ -228,7 +228,7 @@ export function Header() {
               <div className="relative" ref={walletMenuRef}>
                 <button
                   onClick={() => setShowWalletMenu(!showWalletMenu)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors font-medium"
+                  className="flex items-center space-x-2 px-4 py-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-colors font-medium"
                 >
                   <Wallet className="w-4 h-4" />
                   <span className="hidden sm:inline">{formatAddress(address || "")}</span>
@@ -240,15 +240,15 @@ export function Header() {
 
                 {/* Wallet Menu */}
                 {showWalletMenu && (
-                  <div className="absolute right-0 mt-2 w-72 bg-gray-800 rounded-2xl shadow-lg border border-gray-700 overflow-hidden animate-fade-in">
-                    <div className="p-4 border-b border-gray-700">
+                  <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-input-bg rounded-2xl shadow-lg border border-border overflow-hidden animate-fade-in">
+                    <div className="p-4 border-b border-border">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
                           Connected
                         </span>
-                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <div className="w-2 h-2 rounded-full bg-success" />
                       </div>
-                      <div className="font-mono text-sm break-all text-white bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
+                      <div className="font-mono text-sm break-all text-text-primary bg-gray-50 dark:bg-bg rounded-lg px-3 py-2 border border-border">
                         {address}
                       </div>
                     </div>
@@ -256,24 +256,24 @@ export function Header() {
                     <div className="p-2">
                       <button
                         onClick={handleCopy}
-                        className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-gray-700 rounded-xl transition-colors text-gray-300"
+                        className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-bg rounded-xl transition-colors text-text-primary"
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-bg flex items-center justify-center">
                             <Copy className="w-4 h-4" />
                           </div>
                           <span className="font-medium">{copied ? "Copied!" : "Copy Address"}</span>
                         </div>
-                        {copied && <Check className="w-4 h-4 text-green-500" />}
+                        {copied && <Check className="w-4 h-4 text-success" />}
                       </button>
 
                       <a
                         href={explorerUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full flex items-center space-x-3 px-4 py-3 text-sm hover:bg-gray-700 rounded-xl transition-colors text-gray-300"
+                        className="w-full flex items-center space-x-3 px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-bg rounded-xl transition-colors text-text-primary"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-bg flex items-center justify-center">
                           <ExternalLink className="w-4 h-4" />
                         </div>
                         <span className="font-medium">View on Explorer</span>
@@ -281,23 +281,23 @@ export function Header() {
 
                       {balance && (
                         <div className="px-4 py-3 text-sm">
-                          <div className="text-xs text-gray-400 mb-1">Balance</div>
-                          <div className="font-semibold text-white">
+                          <div className="text-xs text-text-secondary mb-1">Balance</div>
+                          <div className="font-semibold text-text-primary">
                             {formatBalance(balance.formatted, 4)} {balance.symbol}
                           </div>
                         </div>
                       )}
 
-                      <div className="border-t border-gray-700 my-2" />
+                      <div className="border-t border-border my-2" />
 
                       <button
                         onClick={() => {
                           disconnect();
                           setShowWalletMenu(false);
                         }}
-                        className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-red-400 hover:bg-red-900/20 rounded-xl transition-colors"
+                        className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-error hover:opacity-80 rounded-xl transition-colors"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-red-900/30 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-error/20 flex items-center justify-center">
                           <LogOut className="w-4 h-4" />
                         </div>
                         <span className="font-medium">Disconnect</span>
@@ -309,14 +309,14 @@ export function Header() {
             ) : mounted ? (
               <button
                 onClick={() => setShowConnectModal(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors font-medium"
+                className="flex items-center space-x-2 px-4 py-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-colors font-medium"
               >
                 <Wallet className="w-4 h-4" />
                 <span className="hidden sm:inline">Connect Wallet</span>
                 <span className="sm:hidden">Connect</span>
               </button>
             ) : (
-              <div className="flex items-center space-x-2 px-4 py-2 bg-pink-500 text-white rounded-lg font-medium opacity-50">
+              <div className="flex items-center space-x-2 px-4 py-2 bg-primary text-bg rounded-lg font-medium opacity-50">
                 <Wallet className="w-4 h-4" />
                 <span className="hidden sm:inline">Connect Wallet</span>
                 <span className="sm:hidden">Connect</span>
@@ -327,7 +327,7 @@ export function Header() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-800 py-4 space-y-1">
+          <div className="md:hidden border-t border-border py-4 space-y-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
               return (
@@ -338,8 +338,8 @@ export function Header() {
                   className={cn(
                     "block px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive
-                      ? "text-white bg-gray-800"
-                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                      ? "text-text-primary bg-gray-100 dark:bg-input-bg"
+                      : "text-text-secondary hover:text-text-primary hover:bg-gray-100 dark:hover:bg-input-bg"
                   )}
                 >
                   {item.label}

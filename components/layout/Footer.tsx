@@ -30,10 +30,10 @@ function CopyableAddress({ address, label, explorerUrl }: CopyableAddressProps) 
   };
 
   return (
-    <div className="group flex items-center justify-between p-3 bg-gray-800 rounded-xl hover:bg-gray-700 transition-colors border border-gray-700">
+    <div className="group flex items-center justify-between p-3 bg-gray-50 dark:bg-input-bg rounded-xl hover:bg-gray-100 dark:hover:bg-bg transition-colors border border-border">
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-gray-400 mb-1 font-medium">{label}</div>
-        <div className="font-mono text-xs text-white truncate">{formatAddress(address)}</div>
+        <div className="text-xs text-text-secondary mb-1 font-medium">{label}</div>
+        <div className="font-mono text-xs text-text-primary truncate">{formatAddress(address)}</div>
       </div>
       <div className="flex items-center space-x-1 ml-2">
         {explorerUrl && (
@@ -41,20 +41,20 @@ function CopyableAddress({ address, label, explorerUrl }: CopyableAddressProps) 
             href={`${explorerUrl}/address/${address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1.5 rounded-lg hover:bg-gray-600 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-bg transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
-            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+            <ExternalLink className="w-3.5 h-3.5 text-text-secondary" />
           </a>
         )}
         <button
           onClick={handleCopy}
-          className="p-1.5 rounded-lg hover:bg-gray-600 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-bg transition-colors"
         >
           {copied ? (
-            <Check className="w-3.5 h-3.5 text-green-500" />
+            <Check className="w-3.5 h-3.5 text-success" />
           ) : (
-            <Copy className="w-3.5 h-3.5 text-gray-400" />
+            <Copy className="w-3.5 h-3.5 text-text-secondary" />
           )}
         </button>
       </div>
@@ -64,33 +64,33 @@ function CopyableAddress({ address, label, explorerUrl }: CopyableAddressProps) 
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-gray-800 bg-gray-900">
+    <footer className="mt-auto border-t border-border bg-bg">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           {/* Brand Section */}
           <div>
             <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">U</span>
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                <span className="text-bg font-bold text-sm">U</span>
               </div>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-lg font-bold text-text-primary">
                 {APP_NAME}
               </h3>
             </div>
-            <p className="text-sm text-gray-400 mb-4">
+            <p className="text-sm text-text-secondary mb-4">
               Decentralized exchange protocol on {CHAIN_NAME}
             </p>
-            <div className="flex items-center space-x-2 text-xs text-gray-500">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
+            <div className="flex items-center space-x-2 text-xs text-text-secondary">
+              <div className="w-2 h-2 rounded-full bg-success" />
               <span>Network Active</span>
             </div>
           </div>
 
           {/* Contracts Section */}
           <div>
-            <h4 className="font-semibold text-white mb-4 flex items-center space-x-2">
-              <Building2 className="w-4 h-4 text-pink-500" />
+            <h4 className="font-semibold text-text-primary mb-4 flex items-center space-x-2">
+              <Building2 className="w-4 h-4 text-primary" />
               <span>Contracts</span>
             </h4>
             <div className="space-y-2">
@@ -114,22 +114,22 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-gray-800">
+        <div className="pt-8 border-t border-border">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-text-secondary">
               <p className="font-medium">
                 © {new Date().getFullYear()} {APP_NAME}
               </p>
               <p className="text-xs mt-1">Built on {CHAIN_NAME}</p>
             </div>
-            <div className="flex items-center space-x-6 text-xs text-gray-500">
-              <Link href="#" className="hover:text-pink-400 transition-colors">
+            <div className="flex items-center space-x-6 text-xs text-text-secondary">
+              <Link href="#" className="hover:text-primary transition-colors">
                 Terms
               </Link>
-              <Link href="#" className="hover:text-pink-400 transition-colors">
+              <Link href="#" className="hover:text-primary transition-colors">
                 Privacy
               </Link>
-              <Link href="#" className="hover:text-pink-400 transition-colors">
+              <Link href="#" className="hover:text-primary transition-colors">
                 Security
               </Link>
             </div>
