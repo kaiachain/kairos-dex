@@ -4,19 +4,23 @@ import { usePositions } from "@/hooks/usePositions";
 import { PositionCard } from "./PositionCard";
 import { AddLiquidity } from "@/components/liquidity/AddLiquidity";
 import { useState } from "react";
+import { Plus, ArrowLeft } from "lucide-react";
+import { useAccount } from "wagmi";
 
 export function PositionList() {
   const { positions, isLoading } = usePositions();
   const [showAddLiquidity, setShowAddLiquidity] = useState(false);
+  const { isConnected } = useAccount();
 
   if (showAddLiquidity) {
     return (
       <div>
         <button
           onClick={() => setShowAddLiquidity(false)}
-          className="mb-4 text-primary hover:opacity-80 hover:underline"
+          className="flex gap-2 items-center px-4 py-2 mb-4 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
         >
-          ← Back to Positions
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Positions</span>
         </button>
         <AddLiquidity fromPositionsPage={true} />
       </div>
@@ -25,13 +29,13 @@ export function PositionList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
           <p className="text-text-secondary">
             {positions.length} position{positions.length !== 1 ? "s" : ""} found
           </p>
           {positions.length > 0 && (
-            <p className="text-sm text-text-secondary mt-1">
+            <p className="mt-1 text-sm text-text-secondary">
               Total value:{" "}
               {positions
                 .reduce((sum, p) => sum + p.value, 0)
@@ -44,28 +48,27 @@ export function PositionList() {
         </div>
         <button
           onClick={() => setShowAddLiquidity(true)}
-          className="px-6 py-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-colors font-medium"
+          className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
         >
-          Create Position
+          <Plus className="w-4 h-4" />
+          <span>Create Position</span>
         </button>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12 text-text-secondary">
+        <div className="py-12 text-center text-text-secondary">
           Loading positions...
         </div>
+      ) : !isConnected ? (
+        <div className="py-12 text-center">
+          <p className="text-text-secondary">Connect wallet to see your positions</p>
+        </div>
       ) : positions.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-text-secondary mb-4">No positions found</p>
-          <button
-            onClick={() => setShowAddLiquidity(true)}
-            className="px-6 py-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-colors"
-          >
-            Create Your First Position
-          </button>
+        <div className="py-12 text-center">
+          <p className="text-text-secondary">No positions found</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {positions.map((position) => (
             <PositionCard
               key={position.tokenId}
