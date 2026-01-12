@@ -74,8 +74,15 @@ function BrandSection() {
   return (
     <div>
       <div className="flex items-center space-x-2 mb-2">
-        <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
-          <span className="text-bg font-bold text-xs">U</span>
+        <div className="w-6 h-6 rounded flex items-center justify-center overflow-hidden">
+          <img 
+            src="/icon.png" 
+            alt="Kairos DEX" 
+            width={24}
+            height={24}
+            className="w-full h-full object-contain"
+            loading="eager"
+          />
         </div>
         <h3 className="text-base font-bold text-text-primary">
           {APP_NAME}
