@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   CONTRACT_V3_CORE_FACTORY,
   CONTRACT_SWAP_ROUTER_02,
@@ -12,7 +11,6 @@ import {
 import { formatAddress } from '@/lib/utils';
 import { ExternalLink, Copy, Check, Building2 } from 'lucide-react';
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
 
 interface CopyableAddressProps {
   address: string;
@@ -30,33 +28,90 @@ function CopyableAddress({ address, label, explorerUrl }: CopyableAddressProps) 
   };
 
   return (
-    <div className="group flex items-center justify-between p-3 bg-gray-50 dark:bg-input-bg rounded-xl hover:bg-gray-100 dark:hover:bg-bg transition-colors border border-border">
+    <div className="group flex items-center gap-2 p-2 bg-gray-50 dark:bg-input-bg rounded-md hover:bg-gray-100 dark:hover:bg-bg transition-colors border border-border">
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-text-secondary mb-1 font-medium">{label}</div>
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="text-xs font-medium text-text-secondary">{label}</span>
+        </div>
         <div className="font-mono text-xs text-text-primary truncate">{formatAddress(address)}</div>
       </div>
-      <div className="flex items-center space-x-1 ml-2">
+      <div className="flex items-center gap-0.5 shrink-0">
         {explorerUrl && (
           <a
             href={`${explorerUrl}/address/${address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-bg transition-colors"
+            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-bg transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
-            <ExternalLink className="w-3.5 h-3.5 text-text-secondary" />
+            <ExternalLink className="w-3 h-3 text-text-secondary" />
           </a>
         )}
         <button
           onClick={handleCopy}
-          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-bg transition-colors"
+          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-bg transition-colors"
         >
           {copied ? (
-            <Check className="w-3.5 h-3.5 text-success" />
+            <Check className="w-3 h-3 text-success" />
           ) : (
-            <Copy className="w-3.5 h-3.5 text-text-secondary" />
+            <Copy className="w-3 h-3 text-text-secondary" />
           )}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function FooterContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {children}
+    </div>
+  );
+}
+
+function BrandSection() {
+  return (
+    <div>
+      <div className="flex items-center space-x-2 mb-2">
+        <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
+          <span className="text-bg font-bold text-xs">U</span>
+        </div>
+        <h3 className="text-base font-bold text-text-primary">
+          {APP_NAME}
+        </h3>
+      </div>
+      <p className="text-xs text-text-secondary">
+        Decentralized exchange protocol on {CHAIN_NAME}
+      </p>
+    </div>
+  );
+}
+
+function ContractsSection() {
+  const contracts = [
+    { address: CONTRACT_V3_CORE_FACTORY, label: 'Factory' },
+    { address: CONTRACT_SWAP_ROUTER_02, label: 'Router' },
+    { address: CONTRACT_NONFUNGIBLE_POSITION_MANAGER, label: 'Position Manager' },
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center space-x-2 mb-2">
+        <Building2 className="w-6 h-6 rounded bg-primary/10 dark:bg-primary/20 p-1.5 text-primary" />
+        <h4 className="text-base font-bold text-text-primary">
+          Contracts
+        </h4>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {contracts.map((contract) => (
+          <CopyableAddress
+            key={contract.label}
+            address={contract.address}
+            label={contract.label}
+            explorerUrl={BLOCK_EXPLORER_URL}
+          />
+        ))}
       </div>
     </div>
   );
@@ -65,77 +120,12 @@ function CopyableAddress({ address, label, explorerUrl }: CopyableAddressProps) 
 export function Footer() {
   return (
     <footer className="mt-auto border-t border-border bg-bg">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          {/* Brand Section */}
-          <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-bg font-bold text-sm">U</span>
-              </div>
-              <h3 className="text-lg font-bold text-text-primary">
-                {APP_NAME}
-              </h3>
-            </div>
-            <p className="text-sm text-text-secondary mb-4">
-              Decentralized exchange protocol on {CHAIN_NAME}
-            </p>
-            <div className="flex items-center space-x-2 text-xs text-text-secondary">
-              <div className="w-2 h-2 rounded-full bg-success" />
-              <span>Network Active</span>
-            </div>
-          </div>
-
-          {/* Contracts Section */}
-          <div>
-            <h4 className="font-semibold text-text-primary mb-4 flex items-center space-x-2">
-              <Building2 className="w-4 h-4 text-primary" />
-              <span>Contracts</span>
-            </h4>
-            <div className="space-y-2">
-              <CopyableAddress
-                address={CONTRACT_V3_CORE_FACTORY}
-                label="Factory"
-                explorerUrl={BLOCK_EXPLORER_URL}
-              />
-              <CopyableAddress
-                address={CONTRACT_SWAP_ROUTER_02}
-                label="Router"
-                explorerUrl={BLOCK_EXPLORER_URL}
-              />
-              <CopyableAddress
-                address={CONTRACT_NONFUNGIBLE_POSITION_MANAGER}
-                label="Position Manager"
-                explorerUrl={BLOCK_EXPLORER_URL}
-              />
-            </div>
-          </div>
+      <FooterContainer>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <BrandSection />
+          <ContractsSection />
         </div>
-
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-border">
-          <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-            <div className="text-sm text-text-secondary">
-              <p className="font-medium">
-                © {new Date().getFullYear()} {APP_NAME}
-              </p>
-              <p className="text-xs mt-1">Built on {CHAIN_NAME}</p>
-            </div>
-            <div className="flex items-center space-x-6 text-xs text-text-secondary">
-              <Link href="#" className="hover:text-primary transition-colors">
-                Terms
-              </Link>
-              <Link href="#" className="hover:text-primary transition-colors">
-                Privacy
-              </Link>
-              <Link href="#" className="hover:text-primary transition-colors">
-                Security
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+      </FooterContainer>
     </footer>
   );
 }
