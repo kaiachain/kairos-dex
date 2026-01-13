@@ -7,17 +7,17 @@ import {
   CHAIN_NAME,
   BLOCK_EXPLORER_URL,
 } from '@/config/env';
-import { formatAddress } from '@/lib/utils';
-import { ExternalLink, Copy, Check, Building2 } from 'lucide-react';
+import { ExternalLink, Copy, Check, Building2, Factory, Route, Layers } from 'lucide-react';
 import { useState } from 'react';
 
-interface CopyableAddressProps {
+interface ContractLinkProps {
   address: string;
   label: string;
+  icon: React.ReactNode;
   explorerUrl?: string;
 }
 
-function CopyableAddress({ address, label, explorerUrl }: CopyableAddressProps) {
+function ContractLink({ address, label, icon, explorerUrl }: ContractLinkProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -27,33 +27,33 @@ function CopyableAddress({ address, label, explorerUrl }: CopyableAddressProps) 
   };
 
   return (
-    <div className="group flex items-center gap-2 p-2 bg-gray-50 dark:bg-input-bg rounded-md hover:bg-gray-100 dark:hover:bg-bg transition-colors border border-border">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-xs font-medium text-text-secondary">{label}</span>
-        </div>
-        <div className="font-mono text-xs text-text-primary truncate">{formatAddress(address)}</div>
+    <div className="group flex items-center gap-2 px-3 py-2 bg-white dark:bg-card rounded-lg border border-border hover:border-primary/50 hover:shadow-md transition-all duration-200">
+      <div className="w-5 h-5 text-primary flex-shrink-0">
+        {icon}
       </div>
-      <div className="flex items-center gap-0.5 shrink-0">
+      <span className="text-sm font-medium text-text-primary">{label}</span>
+      <div className="flex items-center gap-1 shrink-0 ml-auto">
         {explorerUrl && (
           <a
             href={`${explorerUrl}/address/${address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-bg transition-colors"
+            className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-bg transition-colors text-text-secondary hover:text-primary"
             onClick={(e) => e.stopPropagation()}
+            aria-label={`View ${label} on explorer`}
           >
-            <ExternalLink className="w-3 h-3 text-text-secondary" />
+            <ExternalLink className="w-4 h-4" />
           </a>
         )}
         <button
           onClick={handleCopy}
-          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-bg transition-colors"
+          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-bg transition-colors text-text-secondary hover:text-primary"
+          aria-label={`Copy ${label} address`}
         >
           {copied ? (
-            <Check className="w-3 h-3 text-success" />
+            <Check className="w-4 h-4 text-success" />
           ) : (
-            <Copy className="w-3 h-3 text-text-secondary" />
+            <Copy className="w-4 h-4" />
           )}
         </button>
       </div>
@@ -96,25 +96,26 @@ function BrandSection() {
 
 function ContractsSection() {
   const contracts = [
-    { address: CONTRACT_V3_CORE_FACTORY, label: 'Factory' },
-    { address: CONTRACT_SWAP_ROUTER_02, label: 'Router' },
-    { address: CONTRACT_NONFUNGIBLE_POSITION_MANAGER, label: 'Position Manager' },
+    { address: CONTRACT_V3_CORE_FACTORY, label: 'Factory', icon: <Factory className="w-5 h-5" /> },
+    { address: CONTRACT_SWAP_ROUTER_02, label: 'Router', icon: <Route className="w-5 h-5" /> },
+    { address: CONTRACT_NONFUNGIBLE_POSITION_MANAGER, label: 'Position Manager', icon: <Layers className="w-5 h-5" /> },
   ];
 
   return (
     <div>
-      <div className="flex items-center space-x-2 mb-2">
-        <Building2 className="w-6 h-6 rounded bg-primary/10 dark:bg-primary/20 p-1.5 text-primary" />
+      <div className="flex items-center space-x-2 mb-3">
+        <Building2 className="w-8 h-8 rounded bg-primary/10 dark:bg-primary/20 p-1.5 text-primary" />
         <h4 className="text-base font-bold text-text-primary">
           Contracts
         </h4>
       </div>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-row flex-wrap gap-2">
         {contracts.map((contract) => (
-          <CopyableAddress
+          <ContractLink
             key={contract.label}
             address={contract.address}
             label={contract.label}
+            icon={contract.icon}
             explorerUrl={BLOCK_EXPLORER_URL}
           />
         ))}
