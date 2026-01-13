@@ -1,48 +1,223 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePositionDetails } from '@/hooks/usePositionDetails';
 import { formatCurrency, formatNumber, formatBalance } from '@/lib/utils';
-import { useWriteContract, useAccount } from 'wagmi';
+import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { CONTRACTS } from '@/config/contracts';
 import { PositionManager_ABI } from '@/abis/PositionManager';
-import { Plus, Minus, Coins, ExternalLink, Calendar } from 'lucide-react';
+import { Plus, Minus, Coins, ExternalLink, Calendar, Zap, Trash2, Info, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { parseUnits, formatUnits } from 'viem';
 
 interface PositionDetailsProps {
   tokenId: string;
 }
 
 const FULL_RANGE_THRESHOLD = 1e40;
+// Maximum uint128 value for collecting all fees
+const MAX_UINT128 = BigInt(2 ** 128 - 1);
 
 export function PositionDetails({ tokenId }: PositionDetailsProps) {
   const router = useRouter();
   const { address } = useAccount();
-  const { position, isLoading } = usePositionDetails(tokenId);
+  const publicClient = usePublicClient();
+  const { position, isLoading, refetch: refetchPosition } = usePositionDetails(tokenId);
   const [removeAmount, setRemoveAmount] = useState('');
-  const { writeContract: collectFees } = useWriteContract();
+  const [resolvedNftTokenId, setResolvedNftTokenId] = useState<bigint | null>(null);
+  const [isResolvingTokenId, setIsResolvingTokenId] = useState(false);
+  
+  // Parse tokenId - handle both numeric string and position key format
+  // Position key format: owner-pool-tickLower-tickUpper
+  // For collect, we need the actual NFT tokenId (uint256)
+  const numericTokenId = tokenId.includes('-') 
+    ? null // If it's a position key, we'll try to resolve it
+    : BigInt(tokenId);
+
+  // Try to resolve NFT tokenId from position key format
+  useEffect(() => {
+    const resolveNftTokenId = async () => {
+      if (numericTokenId !== null || !address || !position || !publicClient) {
+        return;
+      }
+
+      // If we already resolved it, don't resolve again
+      if (resolvedNftTokenId !== null) {
+        return;
+      }
+
+      setIsResolvingTokenId(true);
+      try {
+        // Parse position key: owner-pool-tickLower-tickUpper
+        const parts = tokenId.split('-');
+        if (parts.length < 4) {
+          setIsResolvingTokenId(false);
+          return;
+        }
+
+        const poolAddress = parts[1]?.toLowerCase();
+        const tickLower = parseInt(parts[2] || parts[3] || '0', 10);
+        const tickUpper = parseInt(parts[parts.length - 1] || '0', 10);
+
+        // Get user's NFT balance
+        const balance = await publicClient.readContract({
+          address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
+          abi: PositionManager_ABI,
+          functionName: 'balanceOf',
+          args: [address],
+        });
+
+        if (balance === 0n) {
+          setIsResolvingTokenId(false);
+          return;
+        }
+
+        // Try to find matching NFT tokenId by checking each NFT
+        for (let i = 0; i < Number(balance); i++) {
+          try {
+            const nftTokenId = await publicClient.readContract({
+              address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
+              abi: PositionManager_ABI,
+              functionName: 'tokenOfOwnerByIndex',
+              args: [address, BigInt(i)],
+            });
+
+            // Read position data for this NFT
+            const posData = await publicClient.readContract({
+              address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
+              abi: PositionManager_ABI,
+              functionName: 'positions',
+              args: [nftTokenId],
+            });
+
+            // Check if this position matches: pool, tickLower, tickUpper
+            const posPool = (posData[2] as string).toLowerCase(); // token0 address (we'll check pool differently)
+            const posTickLower = Number(posData[5]); // tickLower
+            const posTickUpper = Number(posData[6]); // tickUpper
+
+            // Match by ticks (pool matching is complex, so we rely on ticks + owner)
+            if (posTickLower === tickLower && posTickUpper === tickUpper) {
+              setResolvedNftTokenId(nftTokenId);
+              setIsResolvingTokenId(false);
+              return;
+            }
+          } catch (err) {
+            // Continue to next NFT if this one fails
+            continue;
+          }
+        }
+      } catch (error) {
+        console.error('Error resolving NFT tokenId:', error);
+      } finally {
+        setIsResolvingTokenId(false);
+      }
+    };
+
+    resolveNftTokenId();
+  }, [tokenId, address, position, numericTokenId, resolvedNftTokenId, publicClient]);
+
+  // Use resolved NFT tokenId if available, otherwise use numericTokenId
+  const effectiveTokenId = numericTokenId !== null ? numericTokenId : resolvedNftTokenId;
+
+  // Read uncollected fees directly from PositionManager contract
+  const { data: positionData, refetch: refetchPositionData } = useReadContract({
+    address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
+    abi: PositionManager_ABI,
+    functionName: 'positions',
+    args: effectiveTokenId !== null ? [effectiveTokenId] : undefined,
+    query: {
+      enabled: effectiveTokenId !== null && !!position,
+    },
+  });
+
+  // Extract tokensOwed from contract data
+  // PositionManager.positions() returns:
+  // [0] nonce, [1] operator, [2] token0, [3] token1, [4] fee, [5] tickLower, 
+  // [6] tickUpper, [7] liquidity, [8] feeGrowthInside0LastX128, [9] feeGrowthInside1LastX128,
+  // [10] tokensOwed0, [11] tokensOwed1
+  const tokensOwed0 = positionData?.[10] as bigint | undefined; // tokensOwed0 is at index 10
+  const tokensOwed1 = positionData?.[11] as bigint | undefined; // tokensOwed1 is at index 11
+
+  // Calculate uncollected fees in human-readable format
+  const uncollectedFees0 = tokensOwed0 
+    ? parseFloat(formatUnits(tokensOwed0, position?.token0.decimals || 18))
+    : 0;
+  const uncollectedFees1 = tokensOwed1
+    ? parseFloat(formatUnits(tokensOwed1, position?.token1.decimals || 18))
+    : 0;
+  
+  // Calculate USD value of uncollected fees
+  const uncollectedFeesUSD = position
+    ? uncollectedFees0 * position.currentPrice + uncollectedFees1
+    : 0;
+
+  // Determine if there are fees available to collect
+  // Fees are available if either tokensOwed0 > 0 OR tokensOwed1 > 0
+  // We check the raw BigInt values to avoid precision issues with small amounts
+  const hasFeesToCollect = tokensOwed0 !== undefined && tokensOwed1 !== undefined
+    ? (tokensOwed0 > 0n || tokensOwed1 > 0n)
+    : false;
+
+  // Use contract data if available, otherwise fall back to position data
+  const displayUncollectedFees = uncollectedFeesUSD > 0 
+    ? uncollectedFeesUSD 
+    : (position?.uncollectedFees || 0);
+
+  // Collect fees transaction
+  const { 
+    writeContract: collectFees, 
+    data: collectHash, 
+    error: collectError,
+    isPending: isCollectPending 
+  } = useWriteContract();
+
+  const { 
+    isLoading: isConfirming, 
+    isSuccess: isCollectSuccess,
+    isError: isCollectTxError 
+  } = useWaitForTransactionReceipt({
+    hash: collectHash,
+  });
 
   // Extract pool address from tokenId (format: owner-pool-tickLower-tickUpper)
   const poolAddress = tokenId.split('-').length >= 2 ? tokenId.split('-')[1] : null;
 
   const handleCollectFees = () => {
     if (!position || !address) return;
+    
+    // Validate tokenId format
+    if (effectiveTokenId === null) {
+      console.error('Invalid tokenId format for collect. Expected numeric tokenId.');
+      return;
+    }
 
-    collectFees({
-      address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
-      abi: PositionManager_ABI,
-      functionName: 'collect',
-      args: [
-        {
-          tokenId: BigInt(tokenId),
-          recipient: address,
-          amount0Max: BigInt(2 ** 128 - 1),
-          amount1Max: BigInt(2 ** 128 - 1),
-        },
-      ],
-    });
+    try {
+      collectFees({
+        address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
+        abi: PositionManager_ABI,
+        functionName: 'collect',
+        args: [
+          {
+            tokenId: effectiveTokenId,
+            recipient: address,
+            amount0Max: MAX_UINT128,
+            amount1Max: MAX_UINT128,
+          },
+        ],
+      });
+    } catch (error) {
+      console.error('Error calling collect:', error);
+    }
   };
+
+  // Refetch position data after successful collect
+  useEffect(() => {
+    if (isCollectSuccess) {
+      refetchPositionData();
+      refetchPosition?.();
+    }
+  }, [isCollectSuccess, refetchPositionData, refetchPosition]);
 
   if (isLoading) {
     return (
@@ -190,9 +365,29 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
         <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
           <div className="text-sm text-text-secondary mb-1">Uncollected Fees</div>
-          <div className="text-2xl font-bold text-success">
-            {formatCurrency(position.uncollectedFees)}
+          <div className={`text-2xl font-bold ${hasFeesToCollect ? 'text-success' : 'text-text-secondary'}`}>
+            {hasFeesToCollect 
+              ? formatCurrency(displayUncollectedFees)
+              : displayUncollectedFees > 0 
+                ? formatCurrency(displayUncollectedFees)
+                : '$0.00'}
           </div>
+          {hasFeesToCollect && tokensOwed0 !== undefined && tokensOwed1 !== undefined && (
+            <div className="text-xs text-text-secondary mt-2">
+              {uncollectedFees0 > 0 && (
+                <span>{formatBalance(uncollectedFees0.toString(), 4)} {position.token0.symbol}</span>
+              )}
+              {uncollectedFees0 > 0 && uncollectedFees1 > 0 && <span> + </span>}
+              {uncollectedFees1 > 0 && (
+                <span>{formatBalance(uncollectedFees1.toString(), 4)} {position.token1.symbol}</span>
+              )}
+            </div>
+          )}
+          {!hasFeesToCollect && tokensOwed0 !== undefined && tokensOwed1 !== undefined && (
+            <div className="text-xs text-text-secondary mt-2">
+              No fees available to collect
+            </div>
+          )}
           {position.feesEarned > 0 && (
             <div className="text-xs text-text-secondary mt-2">
               Total earned: {formatCurrency(position.feesEarned)}
@@ -443,51 +638,194 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
       )}
 
       {/* Actions */}
-      <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-        <h2 className="text-xl font-bold mb-4 text-text-primary">Actions</h2>
-        <div className="space-y-4">
-          <button
-            onClick={handleCollectFees}
-            disabled={position.uncollectedFees === 0}
-            className="w-full py-3 bg-primary text-bg rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Collect Fees {position.uncollectedFees > 0 && `(${formatCurrency(position.uncollectedFees)})`}
-          </button>
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-text-primary">Actions</h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Collect Fees Card */}
+          <div className="bg-white dark:bg-card rounded-xl p-6 border border-border shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <Coins className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">Collect Fees</h3>
+                <p className="text-xs text-text-secondary">
+                  {hasFeesToCollect 
+                    ? `${formatCurrency(displayUncollectedFees)} available to collect`
+                    : 'No fees available'}
+                </p>
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2 text-text-primary">
-              Remove Liquidity (%)
-            </label>
-            <div className="flex space-x-2">
-              <input
-                type="number"
-                value={removeAmount}
-                onChange={(e) => setRemoveAmount(e.target.value)}
-                placeholder="0"
-                min="0"
-                max="100"
-                className="flex-1 px-4 py-2 bg-gray-50 dark:bg-input-bg rounded-lg border border-border outline-none focus:border-primary text-text-primary"
-              />
+            <button
+              onClick={handleCollectFees}
+              disabled={
+                !hasFeesToCollect || 
+                isCollectPending || 
+                isConfirming ||
+                effectiveTokenId === null ||
+                isResolvingTokenId
+              }
+              className="w-full py-4 bg-primary text-bg rounded-xl font-semibold hover:opacity-90 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+            >
+              {isResolvingTokenId ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Resolving position...
+                </>
+              ) : isCollectPending || isConfirming ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Processing...
+                </>
+              ) : hasFeesToCollect ? (
+                <>
+                  <Zap className="w-5 h-5" />
+                  Collect Fees
+                </>
+              ) : (
+                <>
+                  <Coins className="w-5 h-5" />
+                  No Fees to Collect
+                </>
+              )}
+            </button>
+            
+            {/* Transaction Status Messages */}
+            {collectError && (
+              <div className="mt-4 p-4 bg-error/10 border border-error/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-error mb-1">
+                    Transaction Failed
+                  </p>
+                  <p className="text-xs text-error">
+                    {collectError.message || 'Unknown error occurred'}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {isCollectTxError && (
+              <div className="mt-4 p-4 bg-error/10 border border-error/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-error mb-1">
+                    Transaction Reverted
+                  </p>
+                  <p className="text-xs text-error">
+                    The transaction was reverted. Please try again.
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {isCollectSuccess && (
+              <div className="mt-4 p-4 bg-success/10 border border-success/30 rounded-lg flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-success mb-1">
+                    Fees Collected Successfully!
+                  </p>
+                  {collectHash && (
+                    <a
+                      href={`https://scope.klaytn.com/tx/${collectHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-success hover:opacity-80 hover:underline flex items-center gap-1 mt-1"
+                    >
+                      View Transaction <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Info Note */}
+            <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-start gap-3">
+              <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-text-secondary leading-relaxed">
+                <strong className="text-text-primary">How fees work:</strong> Fees accumulate automatically when swaps occur within your position's price range. 
+                {hasFeesToCollect 
+                  ? ' You have uncollected fees available to collect.'
+                  : ' No fees are currently available. Fees will appear here once swaps happen in your position\'s range.'}
+              </p>
+            </div>
+            
+            {numericTokenId === null && isResolvingTokenId && (
+              <div className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-lg flex items-start gap-3">
+                <Loader2 className="w-5 h-5 text-primary animate-spin flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-text-secondary">
+                  <strong className="text-text-primary">Resolving position...</strong> Finding the NFT tokenId for this position.
+                </p>
+              </div>
+            )}
+
+            {numericTokenId === null && !isResolvingTokenId && effectiveTokenId === null && (
+              <div className="mt-4 p-4 bg-secondary/10 border border-secondary/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-secondary">
+                  <strong>Warning:</strong> Could not find the NFT tokenId for this position. 
+                  Collect fees may not be available. Please ensure you own this position.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Remove Liquidity Card */}
+          <div className="bg-white dark:bg-card rounded-xl p-6 border border-border shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-error" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">Remove Liquidity</h3>
+                <p className="text-xs text-text-secondary">
+                  Withdraw tokens from this position
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Amount to Remove (%)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={removeAmount}
+                    onChange={(e) => setRemoveAmount(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    max="100"
+                    className="flex-1 px-4 py-3 bg-gray-50 dark:bg-input-bg rounded-xl border border-border outline-none focus:border-error focus:ring-2 focus:ring-error/20 text-text-primary transition-all"
+                  />
+                  <button
+                    onClick={() => setRemoveAmount('100')}
+                    className="px-6 py-3 bg-gray-100 dark:bg-bg rounded-xl hover:bg-gray-200 dark:hover:bg-card text-text-primary font-medium transition-colors border border-border"
+                  >
+                    Max
+                  </button>
+                </div>
+              </div>
+              
               <button
-                onClick={() => setRemoveAmount('100')}
-                className="px-4 py-2 bg-gray-100 dark:bg-bg rounded-lg hover:bg-gray-200 dark:hover:bg-card text-text-primary"
+                onClick={() => {
+                  if (!position || !address || !removeAmount) return;
+                  const percentage = parseFloat(removeAmount);
+                  if (percentage <= 0 || percentage > 100) return;
+                  // TODO: Implement remove liquidity functionality
+                  console.log('Remove liquidity:', percentage);
+                }}
+                disabled={!removeAmount || parseFloat(removeAmount) <= 0}
+                className="w-full py-4 bg-error text-bg rounded-xl font-semibold hover:opacity-90 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
               >
-                Max
+                <Trash2 className="w-5 h-5" />
+                Remove Liquidity
               </button>
             </div>
-            <button
-              onClick={() => {
-                if (!position || !address || !removeAmount) return;
-                const percentage = parseFloat(removeAmount);
-                if (percentage <= 0 || percentage > 100) return;
-                // TODO: Implement remove liquidity functionality
-                console.log('Remove liquidity:', percentage);
-              }}
-              disabled={!removeAmount || parseFloat(removeAmount) <= 0}
-              className="w-full mt-2 py-3 bg-error text-bg rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Remove Liquidity
-            </button>
           </div>
         </div>
       </div>

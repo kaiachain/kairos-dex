@@ -222,13 +222,20 @@ export function subgraphPositionToPosition(
   // Calculate value in USD (simplified - would need token prices)
   const value = netToken0 * currentPrice + netToken1;
 
-  // Uncollected fees
+  // NOTE: Uncollected fees cannot be accurately calculated from subgraph data alone.
+  // The subgraph only tracks collected fees (from Collect events), not uncollected fees.
+  // Uncollected fees must be read directly from the PositionManager contract using
+  // the positions() function which returns tokensOwed0 and tokensOwed1.
+  // 
+  // collectedToken0/collectedToken1 represent fees that have already been collected,
+  // NOT uncollected fees. Setting to 0 here - actual uncollected fees should be
+  // fetched from the contract in the component.
+  const uncollectedFees = 0;
+
+  // Total fees earned (from collected fees)
   const collectedToken0 = parseFloat(subgraphPosition.collectedToken0 || "0");
   const collectedToken1 = parseFloat(subgraphPosition.collectedToken1 || "0");
-  const uncollectedFees = collectedToken0 * currentPrice + collectedToken1;
-
-  // Total fees earned
-  const feesEarned = uncollectedFees; // Simplified
+  const feesEarned = collectedToken0 * currentPrice + collectedToken1;
 
   const createdAt = subgraphPosition.createdAtTimestamp
     ? parseInt(subgraphPosition.createdAtTimestamp, 10)
@@ -507,10 +514,14 @@ export function aggregatePositionEvents(
     // Calculate position value
     const value = netToken0 * currentPrice + netToken1;
 
-    // Uncollected fees (simplified - would need to calculate from fee growth)
-    const uncollectedFees = 0; // This would require fee growth calculations
+    // NOTE: Uncollected fees cannot be accurately calculated from subgraph events alone.
+    // The subgraph only tracks collected fees (from Collect events), not uncollected fees.
+    // Uncollected fees must be read directly from the PositionManager contract using
+    // the positions() function which returns tokensOwed0 and tokensOwed1.
+    // Setting to 0 here - actual uncollected fees should be fetched from the contract.
+    const uncollectedFees = 0;
 
-    // Total fees earned (from collects)
+    // Total fees earned (from collects - these are fees that have been collected)
     const feesEarned = collectedToken0 * currentPrice + collectedToken1;
 
     // Find earliest timestamp
