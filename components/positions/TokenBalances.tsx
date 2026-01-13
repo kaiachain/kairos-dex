@@ -117,6 +117,12 @@ export function TokenBalances() {
               const nativeBalanceValue = nativeBalance
                 ? nativeBalance.formatted
                 : "0";
+              
+              // Hide native token if balance is zero (but show while loading)
+              if (!isLoadingNative && (!nativeBalanceValue || parseFloat(nativeBalanceValue) === 0)) {
+                return null;
+              }
+              
               return (
                 <TokenBalanceCard
                   key={token.address}
@@ -140,6 +146,22 @@ export function TokenBalances() {
 
 function TokenBalanceItem({ token }: { token: Token }) {
   const { data: balance, isLoading } = useTokenBalance(token);
+  
+  // Don't render while loading to avoid flickering
+  if (isLoading) {
+    return (
+      <TokenBalanceCard
+        token={token}
+        balance={balance}
+        isLoading={isLoading}
+      />
+    );
+  }
+  
+  // Hide tokens with zero balance
+  if (!balance || parseFloat(balance) === 0) {
+    return null;
+  }
   
   return (
     <TokenBalanceCard
