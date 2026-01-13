@@ -110,6 +110,19 @@ export interface SubgraphCollect {
   tickUpper: string;
 }
 
+export interface SubgraphSwap {
+  id: string;
+  transaction: SubgraphTransaction;
+  timestamp: string;
+  pool: {
+    id: string;
+  };
+  origin: string;
+  sender: string;
+  recipient: string;
+  amountUSD: string;
+}
+
 // Legacy interface for backward compatibility
 export interface SubgraphPosition {
   id: string;
@@ -167,6 +180,10 @@ export interface SubgraphCollectsResponse {
   collects: SubgraphCollect[];
 }
 
+export interface SubgraphSwapsResponse {
+  swaps: SubgraphSwap[];
+}
+
 export interface SubgraphPositionEventsResponse {
   mints: SubgraphMint[];
   burns: SubgraphBurn[];
@@ -199,6 +216,7 @@ export interface SubgraphProtocolStatsFromPoolsResponse {
     totalValueLockedUSD: string;
     volumeUSD: string;
     feesUSD: string;
+    collectedFeesUSD?: string;
     poolDayData: SubgraphPoolDayData[];
   }>;
 }

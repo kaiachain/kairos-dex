@@ -36,7 +36,7 @@ export function TransactionHistory() {
 
   if (transactions.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">No transactions yet</div>
+      <div className="text-center py-8 text-text-secondary">No transactions yet</div>
     );
   }
 
@@ -45,21 +45,21 @@ export function TransactionHistory() {
       {transactions.map((tx) => (
         <div
           key={tx.hash}
-          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg"
+          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-input-bg rounded-lg border border-border"
         >
           <div className="flex items-center space-x-3">
             {tx.status === "success" && (
-              <CheckCircle className="w-5 h-5 text-green-600" />
+              <CheckCircle className="w-5 h-5 text-success" />
             )}
             {tx.status === "failed" && (
-              <XCircle className="w-5 h-5 text-red-600" />
+              <XCircle className="w-5 h-5 text-error" />
             )}
             {tx.status === "pending" && (
-              <Clock className="w-5 h-5 text-yellow-600 animate-spin" />
+              <Clock className="w-5 h-5 text-secondary animate-spin" />
             )}
             <div>
-              <div className="font-medium capitalize">{tx.type}</div>
-              <div className="text-sm text-gray-500 font-mono">
+              <div className="font-medium capitalize text-text-primary">{tx.type}</div>
+              <div className="text-sm text-text-secondary font-mono">
                 {formatAddress(tx.hash)}
               </div>
             </div>
@@ -68,9 +68,9 @@ export function TransactionHistory() {
             href={explorerUrl(tx.hash)}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-bg rounded"
           >
-            <ExternalLink className="w-4 h-4" />
+            <ExternalLink className="w-4 h-4 text-text-secondary" />
           </a>
         </div>
       ))}

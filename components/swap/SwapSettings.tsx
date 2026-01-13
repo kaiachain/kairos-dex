@@ -28,7 +28,7 @@ export function SwapSettings({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+        className="p-2 hover:bg-gray-100 dark:hover:bg-input-bg rounded-xl transition-colors text-text-secondary hover:text-text-primary"
       >
         <Settings className="w-5 h-5" />
       </button>
@@ -39,12 +39,12 @@ export function SwapSettings({
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 p-4">
-            <h3 className="font-semibold mb-4">Transaction Settings</h3>
+          <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-input-bg rounded-2xl shadow-lg border border-border z-50 p-5">
+            <h3 className="font-semibold mb-4 text-text-primary">Transaction Settings</h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-text-secondary">
                   Slippage Tolerance
                 </label>
                 <div className="flex items-center space-x-2 mb-2">
@@ -52,10 +52,10 @@ export function SwapSettings({
                     <button
                       key={preset}
                       onClick={() => onSlippageChange(preset)}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                         slippage === preset
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          ? 'bg-primary text-bg shadow-md'
+                          : 'bg-gray-100 dark:bg-bg hover:bg-gray-200 dark:hover:bg-card text-text-primary'
                       }`}
                     >
                       {preset}%
@@ -69,18 +69,18 @@ export function SwapSettings({
                   min="0"
                   max="50"
                   step="0.1"
-                  className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-bg rounded-xl border border-border outline-none focus:border-primary transition-colors text-text-primary"
                   placeholder="Custom"
                 />
                 {slippage > 5 && (
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                  <p className="text-xs text-error mt-1">
                     High slippage tolerance
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2 text-text-secondary">
                   Transaction Deadline
                 </label>
                 <div className="flex items-center space-x-2">
@@ -90,18 +90,18 @@ export function SwapSettings({
                     onChange={(e) => onDeadlineChange(parseInt(e.target.value) || 20)}
                     min="1"
                     max="60"
-                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-input-bg rounded-xl border border-border outline-none focus:border-primary transition-colors text-text-primary"
                   />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">minutes</span>
+                  <span className="text-sm text-text-secondary">minutes</span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Expert Mode</label>
+                <label className="text-sm font-medium text-text-primary">Expert Mode</label>
                 <button
                   onClick={() => onExpertModeChange(!expertMode)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    expertMode ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+                  className={`relative w-12 h-6 rounded-full transition-all ${
+                    expertMode ? 'bg-primary' : 'bg-secondary'
                   }`}
                 >
                   <div
@@ -112,7 +112,7 @@ export function SwapSettings({
                 </button>
               </div>
               {expertMode && (
-                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                <p className="text-xs text-secondary">
                   Expert mode bypasses confirmation screens and allows high slippage trades
                 </p>
               )}

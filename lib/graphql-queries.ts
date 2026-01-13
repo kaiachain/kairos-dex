@@ -165,6 +165,25 @@ export const COLLECT_FRAGMENT = `
   }
 `;
 
+// Swap query fragment
+export const SWAP_FRAGMENT = `
+  fragment SwapFields on Swap {
+    id
+    transaction {
+      id
+      timestamp
+    }
+    timestamp
+    pool {
+      id
+    }
+    origin
+    sender
+    recipient
+    amountUSD
+  }
+`;
+
 // Query: Get all pools
 export const GET_POOLS_QUERY = `
   ${POOL_FRAGMENT}
@@ -383,12 +402,12 @@ export const GET_PROTOCOL_STATS_FROM_POOLS_QUERY = `
       first: $first
       orderBy: totalValueLockedUSD
       orderDirection: desc
-      where: { totalValueLockedUSD_gt: "0" }
     ) {
       id
       totalValueLockedUSD
       volumeUSD
       feesUSD
+      collectedFeesUSD
       poolDayData(orderBy: date, orderDirection: desc, first: 30) {
         date
         volumeUSD
@@ -443,6 +462,51 @@ export const GET_POOL_HOUR_DATA_QUERY = `
         low
         close
       }
+    }
+  }
+`;
+
+// Query: Get all mints (for counting total positions)
+export const GET_ALL_MINTS_QUERY = `
+  ${MINT_FRAGMENT}
+  query GetAllMints($first: Int!, $skip: Int) {
+    mints(
+      first: $first
+      skip: $skip
+      orderBy: timestamp
+      orderDirection: desc
+    ) {
+      ...MintFields
+    }
+  }
+`;
+
+// Query: Get all burns (for counting total positions)
+export const GET_ALL_BURNS_QUERY = `
+  ${BURN_FRAGMENT}
+  query GetAllBurns($first: Int!, $skip: Int) {
+    burns(
+      first: $first
+      skip: $skip
+      orderBy: timestamp
+      orderDirection: desc
+    ) {
+      ...BurnFields
+    }
+  }
+`;
+
+// Query: Get all swaps (for counting active users)
+export const GET_ALL_SWAPS_QUERY = `
+  ${SWAP_FRAGMENT}
+  query GetAllSwaps($first: Int!, $skip: Int) {
+    swaps(
+      first: $first
+      skip: $skip
+      orderBy: timestamp
+      orderDirection: desc
+    ) {
+      ...SwapFields
     }
   }
 `;

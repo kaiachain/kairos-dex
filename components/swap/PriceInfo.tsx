@@ -73,7 +73,7 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
   const slippageInsufficient = priceImpact > slippage * 0.8; // Warn if price impact is >80% of slippage
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-3 text-sm">
+    <div className="bg-gray-50 dark:bg-input-bg rounded-xl p-4 space-y-3 text-sm border border-border">
       {/* Route Display */}
       {quote.route && quote.route.length > 0 && (
         <RouteDisplay
@@ -84,8 +84,8 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
       )}
 
       <div className="flex items-center justify-between">
-        <span className="text-gray-600 dark:text-gray-400">Price</span>
-        <span className="font-medium">
+        <span className="text-text-secondary">Price</span>
+        <span className="font-medium text-text-primary">
           1 {tokenIn.symbol} ={' '}
           {quote.price && quote.price > 0
             ? quote.price < 0.000001
@@ -99,8 +99,8 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
       {/* Pool Liquidity */}
       {pool && (
         <div className="flex items-center justify-between">
-          <span className="text-gray-600 dark:text-gray-400">Pool Liquidity</span>
-          <span className="font-medium">
+          <span className="text-text-secondary">Pool Liquidity</span>
+          <span className="font-medium text-text-primary">
             {pool.tvl > 0 
               ? `$${formatBalance(pool.tvl, 2)}`
               : 'Low'}
@@ -110,14 +110,14 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
 
       {/* Price Impact */}
       <div className="flex items-center justify-between">
-        <span className="text-gray-600 dark:text-gray-400">Price Impact</span>
+        <span className="text-text-secondary">Price Impact</span>
         <span
           className={`font-medium ${
             priceImpact > 5
-              ? 'text-red-600 dark:text-red-400'
+              ? 'text-error'
               : priceImpact > 3
-              ? 'text-yellow-600 dark:text-yellow-400'
-              : ''
+              ? 'text-secondary'
+              : 'text-text-primary'
           }`}
         >
           {isCalculating ? '...' : formatNumber(priceImpact, 2)}%
@@ -126,7 +126,7 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
 
       {/* Warnings */}
       {priceImpact > 5 && (
-        <div className="flex items-start space-x-2 p-2 bg-red-50 dark:bg-red-900/20 rounded text-red-800 dark:text-red-200">
+        <div className="flex items-start space-x-2 p-2 bg-error/20 rounded text-error border border-error/40">
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <div className="text-xs space-y-1">
             <div className="font-semibold">Very High Price Impact!</div>
@@ -139,7 +139,7 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
       )}
 
       {priceImpact > 3 && priceImpact <= 5 && (
-        <div className="flex items-start space-x-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-yellow-800 dark:text-yellow-200">
+        <div className="flex items-start space-x-2 p-2 bg-secondary/20 rounded text-secondary border border-secondary/40">
           <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span className="text-xs">
             High price impact! This trade will result in significant price movement.
@@ -148,7 +148,7 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
       )}
 
       {slippageInsufficient && priceImpact > 0 && (
-        <div className="flex items-start space-x-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded text-orange-800 dark:text-orange-200">
+        <div className="flex items-start space-x-2 p-2 bg-error/20 rounded text-error border border-error/40">
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <div className="text-xs space-y-1">
             <div className="font-semibold">Slippage may be insufficient</div>
@@ -164,7 +164,7 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
 
       {/* Optimal Swap Size Suggestion */}
       {optimalSwapSize && parseFloat(amountIn) > parseFloat(optimalSwapSize) * 1.2 && (
-        <div className="flex items-start space-x-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-800 dark:text-blue-200">
+        <div className="flex items-start space-x-2 p-2 bg-primary/20 rounded text-primary border border-primary/40">
           <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <div className="text-xs">
             <div className="font-semibold">Swap size suggestion</div>
@@ -176,16 +176,16 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
       )}
 
       <div className="flex items-center justify-between">
-        <span className="text-gray-600 dark:text-gray-400">Minimum received</span>
-        <span className="font-medium">
+        <span className="text-text-secondary">Minimum received</span>
+        <span className="font-medium text-text-primary">
           {minAmountOut} {tokenOut.symbol}
         </span>
       </div>
 
       {quote.gasEstimate && (
         <div className="flex items-center justify-between">
-          <span className="text-gray-600 dark:text-gray-400">Estimated Gas</span>
-          <span className="font-medium">{quote.gasEstimate}</span>
+          <span className="text-text-secondary">Estimated Gas</span>
+          <span className="font-medium text-text-primary">{quote.gasEstimate}</span>
         </div>
       )}
     </div>

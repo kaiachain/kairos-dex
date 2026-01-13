@@ -4,15 +4,25 @@ import { Layout } from '@/components/layout/Layout';
 export default function Home() {
   return (
     <Layout>
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="w-full max-w-2xl">
-          <h1 className="text-4xl font-bold text-center mb-8">
-            Uniswap V3 DEX
-          </h1>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-            Kairos Testnet
+      <div className="relative min-h-[calc(100vh-200px)] flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Background gradient shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="bg-shape bg-shape-1" />
+          <div className="bg-shape bg-shape-2" />
+          <div className="bg-shape bg-shape-3" />
+        </div>
+
+        {/* Hero Content */}
+        <div className="relative z-10 w-full max-w-[420px] space-y-8">
+          {/* Swap Interface Card */}
+          <div className="relative">
+            <SwapInterface />
+          </div>
+
+          {/* Subtitle */}
+          <p className="text-center text-text-secondary text-sm">
+            Trade tokens on Kaia Testnet - Built for developers to test and experiment with DeFi protocols.
           </p>
-          <SwapInterface />
         </div>
       </div>
     </Layout>

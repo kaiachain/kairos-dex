@@ -169,10 +169,10 @@ export function SwapInterface() {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-card rounded-3xl shadow-lg p-6 border border-border">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Swap</h2>
+        <h2 className="text-2xl font-semibold text-text-primary">Swap</h2>
         <SwapSettings
           slippage={slippage}
           deadline={deadline}
@@ -183,15 +183,15 @@ export function SwapInterface() {
         />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {/* Token In Input */}
-        <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">From</label>
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">You pay</label>
             {balanceIn && isConnected && (
               <button
                 onClick={handleMax}
-                className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                className="text-xs text-primary hover:opacity-80 font-medium transition-colors"
               >
                 Balance: {formatBalance(balanceIn, 4)}
               </button>
@@ -204,8 +204,8 @@ export function SwapInterface() {
                 inputMode="decimal"
                 value={amountIn}
                 onChange={(e) => handleAmountChange(e.target.value)}
-                placeholder="0.0"
-                className="w-full text-2xl font-semibold bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400"
+                placeholder="0"
+                className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-primary placeholder-text-secondary"
                 disabled={!tokenIn}
               />
             </div>
@@ -218,31 +218,31 @@ export function SwapInterface() {
         </div>
 
         {/* Reverse Button */}
-        <div className="flex justify-center -my-2 relative z-10">
+        <div className="flex justify-center -my-1 relative z-10">
           <button
             onClick={handleReverse}
-            className="p-2 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
+            className="p-2.5 bg-white dark:bg-card border-2 border-border rounded-full hover:bg-gray-50 dark:hover:bg-bg transition-all shadow-md hover:shadow-lg hover:border-primary"
             aria-label="Reverse tokens"
           >
-            <ArrowDownUp className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <ArrowDownUp className="w-5 h-5 text-text-secondary" />
           </button>
         </div>
 
         {/* Token Out Input */}
-        <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">To</label>
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">You receive</label>
             {isQuoteLoading ? (
-              <span className="text-xs text-gray-500 dark:text-gray-500 flex items-center gap-1">
+              <span className="text-xs text-text-secondary flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Fetching quote...
               </span>
             ) : quote?.amountOut ? (
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-text-secondary font-medium">
                 ≈ {formatBalance(quote.amountOut, 6)}
               </span>
             ) : quoteError ? (
-              <span className="text-xs text-red-600 dark:text-red-400">
+              <span className="text-xs text-error">
                 Quote error
               </span>
             ) : null}
@@ -250,16 +250,16 @@ export function SwapInterface() {
           <div className="flex items-center gap-3">
             <div className="flex-1 relative">
               {isQuoteLoading && tokenIn && tokenOut && amountIn && parseFloat(amountIn) > 0 ? (
-                <div className="flex items-center justify-center h-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary-600 dark:text-primary-400" />
+                <div className="flex items-center justify-center h-14">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
               ) : (
                 <input
                   type="text"
                   value={quote?.amountOut || ''}
-                  placeholder="0.0"
+                  placeholder="0"
                   readOnly
-                  className="w-full text-2xl font-semibold bg-transparent border-none outline-none text-gray-400 dark:text-gray-500"
+                  className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-secondary placeholder-text-secondary"
                 />
               )}
             </div>

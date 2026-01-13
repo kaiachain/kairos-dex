@@ -24,7 +24,7 @@ export function ErrorDisplay({ error, onDismiss, className = '' }: ErrorDisplayP
   };
 
   return (
-    <div className={`flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-800 dark:text-red-200 text-sm ${className}`}>
+    <div className={`flex items-start gap-3 p-3 bg-error/20 rounded-lg text-error text-sm border border-error/40 ${className}`}>
       <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
       <div className="flex-1">
         <p className="font-medium">Error</p>
@@ -33,7 +33,7 @@ export function ErrorDisplay({ error, onDismiss, className = '' }: ErrorDisplayP
       {onDismiss && (
         <button
           onClick={handleDismiss}
-          className="p-1 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
+          className="p-1 hover:bg-error/30 rounded transition-colors"
           aria-label="Dismiss error"
         >
           <X className="w-4 h-4" />

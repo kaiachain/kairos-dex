@@ -247,84 +247,124 @@ export function CreatePool() {
   const isFullySuccess = isSuccess && isInitSuccess;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 max-w-2xl">
-      <h2 className="text-2xl font-bold mb-6">Create Pool</h2>
-
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium mb-2">Token 0</label>
-          <TokenSelector
-            selectedToken={token0}
-            onTokenSelect={setToken0}
-            excludeToken={token1}
-          />
+    <div className="bg-white dark:bg-card rounded-3xl shadow-lg p-6 border border-border">
+      <div className="space-y-3">
+        {/* Token 0 Input */}
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Token 0</label>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 relative">
+              <div className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-primary min-h-[42px] flex items-center">
+                {token0 ? token0.symbol : <span className="text-text-secondary">Select token</span>}
+              </div>
+            </div>
+            <TokenSelector
+              selectedToken={token0}
+              onTokenSelect={setToken0}
+              excludeToken={token1}
+            />
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Token 1</label>
-          <TokenSelector
-            selectedToken={token1}
-            onTokenSelect={setToken1}
-            excludeToken={token0}
-          />
+        {/* Token 1 Input */}
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Token 1</label>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 relative">
+              <div className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-primary min-h-[42px] flex items-center">
+                {token1 ? token1.symbol : <span className="text-text-secondary">Select token</span>}
+              </div>
+            </div>
+            <TokenSelector
+              selectedToken={token1}
+              onTokenSelect={setToken1}
+              excludeToken={token0}
+            />
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Fee Tier</label>
+        {/* Fee Tier */}
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border">
+          <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-3">Fee Tier</label>
           <div className="grid grid-cols-4 gap-2">
             {FEE_TIERS.map((tier) => (
               <button
                 key={tier.value}
                 onClick={() => setFee(tier.value)}
-                className={`p-3 rounded-lg border transition-colors ${
+                className={`p-2.5 rounded-lg border transition-all ${
                   fee === tier.value
-                    ? "bg-primary-600 text-white border-primary-600"
-                    : "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+                    ? "bg-primary text-bg border-primary shadow-sm"
+                    : "bg-white dark:bg-card border-border hover:border-primary/50"
                 }`}
               >
-                <div className="font-semibold">{tier.label}</div>
-                <div className="text-xs opacity-75">{tier.description}</div>
+                <div className={`font-semibold text-xs leading-tight ${
+                  fee === tier.value
+                    ? "text-bg"
+                    : "text-text-primary"
+                }`}>{tier.label}</div>
+                <div className={`text-[10px] mt-0.5 leading-tight ${
+                  fee === tier.value
+                    ? "text-bg/60"
+                    : "text-text-primary/50"
+                }`}>{tier.description}</div>
               </button>
             ))}
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Initial Price ({token1?.symbol} per {token0?.symbol})
-          </label>
-          <input
-            type="text"
-            value={initialPrice}
-            onChange={(e) => setInitialPrice(e.target.value)}
-            placeholder="1.0"
-            className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border-none outline-none"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Set the initial price for this pool
-          </p>
+        {/* Initial Price Input */}
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+              Initial Price
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={initialPrice}
+                onChange={(e) => setInitialPrice(e.target.value)}
+                placeholder="0"
+                className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-primary placeholder-text-secondary"
+              />
+              {token0 && token1 && (
+                <p className="text-xs text-text-secondary mt-1">
+                  {token1.symbol} per {token0.symbol}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
+        {/* Status Messages */}
         {!isConnected && (
-          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          <div className="p-4 bg-secondary/20 border border-secondary/40 rounded-lg">
+            <p className="text-sm text-text-primary">
               Please connect your wallet to create a pool.
             </p>
           </div>
         )}
 
         {displayError && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-800 dark:text-red-200 font-semibold mb-1">
+          <div className="p-4 bg-error/20 border border-error/40 rounded-lg">
+            <p className="text-sm text-error font-semibold mb-1">
               Transaction Failed
             </p>
-            <p className="text-xs text-red-700 dark:text-red-300">
+            <p className="text-xs text-error">
               {writeError?.message ||
                 txError?.message ||
+                initWriteError?.message ||
+                initTxError?.message ||
                 "Unknown error occurred"}
             </p>
             {writeError?.message?.includes("reverted") && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+              <p className="text-xs text-error mt-2">
                 Common causes: Invalid token addresses, pool already exists, or
                 insufficient gas.
               </p>
@@ -333,12 +373,12 @@ export function CreatePool() {
         )}
 
         {isSuccess && !isInitSuccess && (
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-800 dark:text-blue-200 font-semibold mb-1">
+          <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+            <p className="text-sm text-text-primary font-semibold mb-1">
               Pool Created! Initializing...
             </p>
             {hash && (
-              <p className="text-xs text-blue-700 dark:text-blue-300">
+              <p className="text-xs text-text-secondary font-mono">
                 Create TX: {hash.slice(0, 10)}...{hash.slice(-8)}
               </p>
             )}
@@ -346,32 +386,39 @@ export function CreatePool() {
         )}
 
         {isFullySuccess && (
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <p className="text-sm text-green-800 dark:text-green-200 font-semibold mb-1">
+          <div className="p-4 bg-success/20 border border-success/40 rounded-lg">
+            <p className="text-sm text-success font-semibold mb-1">
               Pool Created and Initialized Successfully! 🎉
             </p>
             {poolAddress && (
-              <p className="text-xs text-green-700 dark:text-green-300 break-all">
+              <p className="text-xs text-text-primary break-all font-mono mt-1">
                 Pool Address: {poolAddress}
               </p>
             )}
-            {hash && (
-              <p className="text-xs text-green-700 dark:text-green-300">
-                Create TX: {hash.slice(0, 10)}...{hash.slice(-8)}
-              </p>
-            )}
-            {initHash && (
-              <p className="text-xs text-green-700 dark:text-green-300">
-                Init TX: {initHash.slice(0, 10)}...{initHash.slice(-8)}
-              </p>
-            )}
+            <div className="mt-2 space-y-1">
+              {hash && (
+                <p className="text-xs text-text-secondary font-mono">
+                  Create TX: {hash.slice(0, 10)}...{hash.slice(-8)}
+                </p>
+              )}
+              {initHash && (
+                <p className="text-xs text-text-secondary font-mono">
+                  Init TX: {initHash.slice(0, 10)}...{initHash.slice(-8)}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
+        {/* Create Pool Button */}
         <button
           onClick={handleCreatePool}
           disabled={isButtonDisabled}
-          className="w-full py-4 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`w-full py-4 rounded-2xl font-semibold transition-all shadow-md hover:shadow-lg ${
+            isButtonDisabled
+              ? "bg-secondary text-text-secondary cursor-not-allowed hover:shadow-md"
+              : "bg-primary text-bg hover:opacity-90"
+          }`}
         >
           {isInitPending || isInitLoading
             ? "Initializing Pool..."
