@@ -29,6 +29,7 @@ import { usePools } from "@/hooks/usePools";
 import { calculatePriceFromTick } from "@/lib/subgraph-utils";
 import { erc20Abi, encodeFunctionData } from "viem";
 import { Search } from "lucide-react";
+import { showToast } from "@/lib/showToast";
 
 interface AddLiquidityProps {
   initialToken0?: Token | null;
@@ -65,7 +66,7 @@ export function AddLiquidity({
   // Fetch pools for selection when coming from Positions page
   const { pools, isLoading: isLoadingPools } = usePools();
 
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const {
     writeContract: addLiquidity,
     data: hash,
@@ -446,6 +447,16 @@ export function AddLiquidity({
   };
 
   const handleAddLiquidity = () => {
+    // Check wallet connection first
+    if (!isConnected) {
+      showToast({
+        type: 'warning',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet first to add liquidity',
+      });
+      return;
+    }
+
     if (!token0 || !token1 || !amount0 || !amount1) {
       console.error("Missing tokens or amounts:", { token0, token1, amount0, amount1 });
       return;
@@ -1134,7 +1145,18 @@ export function AddLiquidity({
             isApproving ||
             poolNeedsInitialization
           }
-          className="w-full py-4 bg-primary text-bg rounded-xl font-semibold hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`w-full py-4 rounded-2xl font-semibold transition-all shadow-md hover:shadow-lg ${
+            !token0 ||
+            !token1 ||
+            !amount0 ||
+            !amount1 ||
+            hasErrors ||
+            isConfirming ||
+            isApproving ||
+            poolNeedsInitialization
+              ? "bg-secondary text-text-secondary cursor-not-allowed hover:shadow-md"
+              : "bg-primary text-bg hover:opacity-90"
+          }`}
         >
           {isApproving
             ? "Approving..."

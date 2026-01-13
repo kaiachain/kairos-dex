@@ -15,7 +15,7 @@ export default function PoolsPage() {
   const handleCreatePoolClick = () => {
     if (!isConnected) {
       showToast({
-        type: 'info',
+        type: 'warning',
         title: 'Wallet Not Connected',
         description: 'Please connect your wallet first to create a pool',
       });
@@ -56,11 +56,7 @@ export default function PoolsPage() {
             <h1 className="text-3xl font-bold text-text-primary">Pools</h1>
             <button
               onClick={handleCreatePoolClick}
-              className={`flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg transition-all font-medium ${
-                !isConnected
-                  ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:border-border'
-                  : 'hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary'
-              }`}
+              className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg transition-all font-medium hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
             >
               <Plus className="w-4 h-4" />
               <span>Create Pool</span>

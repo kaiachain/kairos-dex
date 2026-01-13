@@ -5,11 +5,24 @@ import { PositionCard } from "./PositionCard";
 import { Plus } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useRouter } from "next/navigation";
+import { showToast } from "@/lib/showToast";
 
 export function PositionList() {
   const { positions, isLoading } = usePositions();
   const { isConnected } = useAccount();
   const router = useRouter();
+
+  const handleCreatePositionClick = () => {
+    if (!isConnected) {
+      showToast({
+        type: 'warning',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet first to create a position',
+      });
+    } else {
+      router.push('/add-liquidity');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -31,9 +44,9 @@ export function PositionList() {
           )}
         </div>
         <button
-          onClick={() => router.push('/add-liquidity')}
-          disabled={!isConnected}
-          className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-border"
+          type="button"
+          onClick={handleCreatePositionClick}
+          className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
         >
           <Plus className="w-4 h-4" />
           <span>Create Position</span>

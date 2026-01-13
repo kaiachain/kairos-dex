@@ -4,6 +4,9 @@ import { usePoolDetails } from '@/hooks/usePoolDetails';
 import { formatCurrency, formatNumber, formatAddress } from '@/lib/utils';
 import { AddLiquidity } from '@/components/liquidity/AddLiquidity';
 import { useState } from 'react';
+import { useAccount } from 'wagmi';
+import { showToast } from '@/lib/showToast';
+import { Plus } from 'lucide-react';
 
 interface PoolDetailsProps {
   poolAddress: string;
@@ -12,6 +15,19 @@ interface PoolDetailsProps {
 export function PoolDetails({ poolAddress }: PoolDetailsProps) {
   const { pool, isLoading } = usePoolDetails(poolAddress);
   const [showAddLiquidity, setShowAddLiquidity] = useState(false);
+  const { isConnected } = useAccount();
+
+  const handleAddLiquidityClick = () => {
+    if (!isConnected) {
+      showToast({
+        type: 'warning',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet first to add liquidity',
+      });
+    } else {
+      setShowAddLiquidity(true);
+    }
+  };
 
   if (isLoading) {
     return <div className="text-center py-12 text-text-secondary">Loading pool details...</div>;
@@ -55,10 +71,11 @@ export function PoolDetails({ poolAddress }: PoolDetailsProps) {
           </p>
         </div>
         <button
-          onClick={() => setShowAddLiquidity(true)}
-          className="px-6 py-2 bg-primary text-bg rounded-lg hover:opacity-90 transition-colors"
+          onClick={handleAddLiquidityClick}
+          className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg transition-all font-medium hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
         >
-          Add Liquidity
+          <Plus className="w-4 h-4" />
+          <span>Add Liquidity</span>
         </button>
       </div>
 
