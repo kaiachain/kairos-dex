@@ -8,6 +8,12 @@ import { aggregatePositionEvents } from "@/lib/subgraph-utils";
 /**
  * Parse position tokenId to extract owner, pool, tickLower, tickUpper
  * Format: owner-pool-tickLower-tickUpper
+ * Note: Both tickLower and tickUpper can be negative, which creates double dashes
+ * Examples:
+ *   - owner-pool-tickLower-tickUpper (both positive)
+ *   - owner-pool--tickLower-tickUpper (tickLower negative)
+ *   - owner-pool-tickLower--tickUpper (tickUpper negative)
+ *   - owner-pool--tickLower--tickUpper (both negative)
  */
 function parsePositionId(tokenId: string): {
   owner: string;
@@ -16,14 +22,77 @@ function parsePositionId(tokenId: string): {
   tickUpper: string;
 } | null {
   const parts = tokenId.split("-");
-  if (parts.length !== 4) {
+  
+  // Need at least 4 parts: owner, pool, tickLower, tickUpper
+  // Can have more if ticks are negative (double dashes create empty strings)
+  if (parts.length < 4) {
     return null;
   }
+  
+  // Owner and pool are always the first two parts (Ethereum addresses)
+  const owner = parts[0].toLowerCase();
+  const pool = parts[1].toLowerCase();
+  
+  // Validate that owner and pool are addresses (start with 0x and are 42 chars)
+  if (!owner.startsWith("0x") || owner.length !== 42) {
+    return null;
+  }
+  if (!pool.startsWith("0x") || pool.length !== 42) {
+    return null;
+  }
+  
+  // Parse the remaining parts to extract tickLower and tickUpper
+  // The pattern can be:
+  // - parts[2], parts[3] (both positive: "tickLower", "tickUpper")
+  // - "", parts[3], parts[4] (tickLower negative: "", "tickLower", "tickUpper")
+  // - parts[2], "", parts[4] (tickUpper negative: "tickLower", "", "tickUpper")
+  // - "", parts[3], "", parts[5] (both negative: "", "tickLower", "", "tickUpper")
+  
+  let tickLower: string;
+  let tickUpper: string;
+  let remainingParts = parts.slice(2);
+  
+  // Check if first remaining part is empty (tickLower is negative)
+  if (remainingParts[0] === "") {
+    // tickLower is negative
+    if (remainingParts.length < 2) {
+      return null;
+    }
+    tickLower = "-" + remainingParts[1];
+    remainingParts = remainingParts.slice(2);
+  } else {
+    // tickLower is positive
+    tickLower = remainingParts[0];
+    remainingParts = remainingParts.slice(1);
+  }
+  
+  // Now parse tickUpper
+  if (remainingParts.length === 0) {
+    return null;
+  }
+  
+  // Check if first remaining part is empty (tickUpper is negative)
+  if (remainingParts[0] === "") {
+    // tickUpper is negative
+    if (remainingParts.length < 2) {
+      return null;
+    }
+    tickUpper = "-" + remainingParts[1];
+  } else {
+    // tickUpper is positive
+    tickUpper = remainingParts[0];
+  }
+  
+  // Validate that ticks are numeric
+  if (!/^-?\d+$/.test(tickLower) || !/^-?\d+$/.test(tickUpper)) {
+    return null;
+  }
+  
   return {
-    owner: parts[0].toLowerCase(),
-    pool: parts[1].toLowerCase(),
-    tickLower: parts[2],
-    tickUpper: parts[3],
+    owner,
+    pool,
+    tickLower,
+    tickUpper,
   };
 }
 
