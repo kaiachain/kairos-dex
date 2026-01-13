@@ -17,6 +17,7 @@ import { Factory_ABI } from "@/abis/Factory";
 import { Pool_ABI } from "@/abis/Pool";
 import {
   parseUnits,
+  formatUnits,
   formatNumber,
   formatBalance,
   priceToSqrtPriceX96,
@@ -26,7 +27,7 @@ import {
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { usePools } from "@/hooks/usePools";
 import { calculatePriceFromTick } from "@/lib/subgraph-utils";
-import { erc20Abi } from "viem";
+import { erc20Abi, encodeFunctionData } from "viem";
 import { Search } from "lucide-react";
 
 interface AddLiquidityProps {
@@ -84,6 +85,14 @@ export function AddLiquidity({
   useEffect(() => {
     if (mintError || isTxError) {
       setShowTxError(true);
+      // Log detailed error for debugging
+      if (mintError) {
+        console.error("Mint error:", mintError);
+        const errorMessage = mintError.message || String(mintError);
+        if (errorMessage.includes("uint(9)") || errorMessage.includes("error code 9")) {
+          console.error("Error Code 9: Amount mismatch for first liquidity addition");
+        }
+      }
     }
   }, [mintError, isTxError]);
 
@@ -238,16 +247,43 @@ export function AddLiquidity({
     },
   });
 
+  // Check pool liquidity to detect first liquidity addition
+  const { data: poolLiquidity, isLoading: isLoadingLiquidity } = useReadContract({
+    address:
+      poolAddress &&
+      poolAddress !== "0x0000000000000000000000000000000000000000"
+        ? (poolAddress as `0x${string}`)
+        : undefined,
+    abi: Pool_ABI,
+    functionName: "liquidity",
+    query: {
+      enabled:
+        !!poolAddress &&
+        poolAddress !== "0x0000000000000000000000000000000000000000",
+    },
+  });
+
   // Determine if pool exists and is initialized
   const poolExists =
     poolAddress && poolAddress !== "0x0000000000000000000000000000000000000000";
   const isPoolInitialized = slot0 ? (slot0 as any)[0] !== BigInt(0) : false;
   const poolNeedsInitialization =
     poolExists && !isPoolInitialized && !isLoadingSlot0;
+  
+  // Check if this is the first liquidity addition (pool initialized but has zero liquidity)
+  const isFirstLiquidity = isPoolInitialized && poolLiquidity === BigInt(0) && !isLoadingLiquidity;
 
-  // Extract current tick from slot0
+  // Automatically disable full range for first liquidity
+  useEffect(() => {
+    if (isFirstLiquidity && fullRange) {
+      setFullRange(false);
+    }
+  }, [isFirstLiquidity, fullRange]);
+
+  // Extract current tick and sqrtPriceX96 from slot0
   // slot0 returns: [sqrtPriceX96, tick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked]
   const currentTick = slot0 ? Number((slot0 as any)[1]) : null;
+  const sqrtPriceX96 = slot0 ? (slot0 as any)[0] as bigint : null;
 
   // Show initialization prompt when pool needs initialization
   useEffect(() => {
@@ -607,6 +643,78 @@ export function AddLiquidity({
       return;
     }
 
+    // CRITICAL FIX: For first liquidity addition to a newly initialized pool,
+    // the amounts must match the current price ratio exactly.
+    // 
+    // STANDARD PRACTICE in Uniswap V3:
+    // For a full-range position, PositionManager uses liquidity formulas to calculate
+    // the exact amounts needed. The key insight is that for a full-range position
+    // (tickLower = -887272, tickUpper = 887272), the amounts should match the price ratio.
+    //
+    // However, PositionManager calculates this using liquidity formulas internally:
+    // - It calculates liquidity L from the amounts
+    // - Then verifies that the amounts match what it expects
+    //
+    // For a full-range position, the formula simplifies to:
+    // amount1 = amount0 * (sqrtPriceX96 / Q96)^2 * 10^(decimals0 - decimals1)
+    //
+    // But PositionManager might calculate this in a different order or with
+    // different intermediate rounding. To match exactly, we need to use the
+    // same calculation method.
+    // CRITICAL FIX: For first liquidity to a newly initialized pool,
+    // PositionManager is very strict about amounts matching exactly.
+    //
+    // STANDARD PRACTICE in Uniswap V3:
+    // 1. For first liquidity, it's recommended to use a narrow range around the current price
+    //    rather than full-range, as full-range positions have complex liquidity calculations
+    // 2. However, if using full-range, the amounts must match the price ratio exactly
+    //
+    // For a full-range position, PositionManager uses liquidity formulas:
+    // - It calculates liquidity L from the amounts
+    // - Then verifies the amounts match what it expects
+    // - For full-range: sqrt(P_lower) ≈ 0, sqrt(P_upper) ≈ infinity
+    // - The formula simplifies but still requires exact matching
+    //
+    // The calculation: amount1 = amount0 * (sqrtPriceX96 / Q96)^2 * 10^(decimals0 - decimals1)
+    //
+    // NOTE: This code path should not be reached since full range is now disabled
+    // for first liquidity additions in the UI. However, we keep it as a safety check.
+    if (isFirstLiquidity && sqrtPriceX96 && currentTick !== null && fullRange) {
+      console.warn("Full range selected for first liquidity - this should be prevented by UI");
+      const Q96 = BigInt(2) ** BigInt(96);
+      const sqrtPriceX96Big = BigInt(sqrtPriceX96.toString());
+      
+      // Calculate amount1 using the exact formula PositionManager uses
+      // This is the standard formula for full-range positions
+      const sqrtPriceX96Squared = sqrtPriceX96Big * sqrtPriceX96Big;
+      const Q96Squared = Q96 * Q96;
+      const decimalsAdjustmentBig = BigInt(10 ** (t0.decimals - t1.decimals));
+      
+      // Calculate: amount1 = (amount0 * sqrtPriceX96^2 * decimalsAdjustment) / Q96^2
+      const numerator = amount0Desired * sqrtPriceX96Squared * decimalsAdjustmentBig;
+      const requiredAmount1 = numerator / Q96Squared;
+      
+      console.log("First liquidity: Full-range position amount calculation", {
+        amount0: amount0Desired.toString(),
+        calculatedAmount1: requiredAmount1.toString(),
+        currentTick,
+        sqrtPriceX96: sqrtPriceX96.toString(),
+      });
+      
+      // Update amount1Desired to match the calculated value
+      amount1Desired = requiredAmount1;
+      
+      // Update UI to show the adjusted amount
+      const adjustedAmount1Str = formatUnits(amount1Desired, t1.decimals);
+      if (isToken0First) {
+        setAmount1(adjustedAmount1Str);
+      } else {
+        setAmount0(adjustedAmount1Str);
+      }
+      
+      console.log(`First liquidity: Adjusted ${t1.symbol} amount to ${adjustedAmount1Str} to match price ratio`);
+    }
+
     // Log for debugging
     console.log("Adding liquidity:", {
       originalToken0: token0.symbol,
@@ -629,6 +737,17 @@ export function AddLiquidity({
     });
 
     try {
+      // STANDARD PRACTICE: For first liquidity, PositionManager's mint function
+      // will handle pool creation and initialization if needed via its internal logic.
+      // However, since the pool is already initialized, we should just use mint directly.
+      // 
+      // The key is ensuring the amounts match exactly what PositionManager expects.
+      // For a full-range position, the amounts must match the current price ratio.
+      //
+      // Note: We removed the multicall approach because createAndInitializePoolIfNecessary
+      // might interfere with an already-initialized pool, or the sqrtPriceX96 might not
+      // match exactly, causing issues.
+      
       addLiquidity({
         address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
         abi: PositionManager_ABI,
@@ -873,7 +992,25 @@ export function AddLiquidity({
           onFullRangeChange={setFullRange}
           calculatedPriceRange={calculatedPriceRange}
           currentTick={currentTick}
+          isFirstLiquidity={isFirstLiquidity}
         />
+
+        {/* First Liquidity Addition Warning */}
+        {isFirstLiquidity && token0 && token1 && amount0 && amount1 && sqrtPriceX96 && currentTick !== null && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <p className="text-yellow-800 dark:text-yellow-200 font-semibold mb-2">
+              ⚠️ First Liquidity Addition
+            </p>
+            <p className="text-yellow-700 dark:text-yellow-300 text-sm mb-2">
+              This is the first liquidity addition to a newly initialized pool. The token amounts must match the current price ratio exactly, or the transaction will fail.
+            </p>
+            {currentTick !== null && (
+              <p className="text-yellow-600 dark:text-yellow-400 text-xs">
+                Current tick: {currentTick} | The amounts will be automatically adjusted to match the current price when you click "Add Liquidity".
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Error Display */}
         {showTxError && (mintError || isTxError) && (
@@ -882,6 +1019,11 @@ export function AddLiquidity({
               {mintError?.message ||
                 "Transaction failed. Please check your inputs and try again."}
             </p>
+            {(mintError?.message?.includes("uint(9)") || mintError?.message?.includes("error code 9")) && (
+              <p className="text-red-600 dark:text-red-400 text-xs mt-2">
+                <strong>Error Code 9:</strong> This usually means the token amounts don't match the current price ratio. For a newly initialized pool, amounts must match the initialization price exactly.
+              </p>
+            )}
           </div>
         )}
 

@@ -1,428 +1,379 @@
-import { useState, useEffect } from "react";
+/**
+ * Swap Quote Hook using Smart Order Router
+ * 
+ * This hook uses the centralized router instance for getting quotes
+ */
+
+import { useState, useEffect, useMemo } from "react";
 import { Token } from "@/types/token";
 import { SwapQuote } from "@/types/swap";
-import { FeeAmount } from "@uniswap/v3-sdk";
-import { Token as SDKToken } from "@uniswap/sdk-core";
-import { formatUnits, parseUnits } from "@/lib/utils";
-import { CONTRACTS } from "@/config/contracts";
-import { QuoterV2_ABI } from "@/abis/QuoterV2";
-import { Pool_ABI } from "@/abis/Pool";
-import { Factory_ABI } from "@/abis/Factory";
-import { createPublicClient, http } from "viem";
-import { kairosTestnet } from "@/config/wagmi";
+import { CurrencyAmount, TradeType, ChainId } from "@uniswap/sdk-core";
+import { getAddress } from "@ethersproject/address";
+import { JsonRpcProvider } from "@ethersproject/providers";
+import { usePublicClient } from "wagmi";
 import { RPC_URL } from "@/config/env";
-import { CHAIN_ID } from "@/config/env";
+import { getRouterInstance } from "@/lib/router-instance";
+import { fromReadableAmount, TokenAmount } from "@/lib/router-setup";
 
-// Create a public client for read operations
-const publicClient = createPublicClient({
-  chain: kairosTestnet,
-  transport: http(RPC_URL),
-});
-
-/**
- * Convert app Token to SDK Token
- */
-function tokenToSDKToken(token: Token): SDKToken {
+// Convert app Token to SDK Token
+function tokenToSDKToken(token: Token) {
+  const { Token: SDKToken } = require("@uniswap/sdk-core");
   return new SDKToken(
-    CHAIN_ID,
-    token.address as `0x${string}`,
-    token.decimals,
+    ChainId.MAINNET,
+    getAddress(token.address),
+    token.decimals || 18,
     token.symbol,
     token.name
   );
 }
 
 /**
- * Check if pool exists by querying the Factory contract
- * Following the Uniswap V3 SDK docs pattern
+ * Get quote using AlphaRouter
+ * Following execute-swap-sdk.js main function pattern
  */
-async function checkPoolExists(
-  tokenA: SDKToken,
-  tokenB: SDKToken,
-  fee: FeeAmount
-): Promise<string | null> {
-  try {
-    const poolAddress = await publicClient.readContract({
-      address: CONTRACTS.V3CoreFactory as `0x${string}`,
-      abi: Factory_ABI,
-      functionName: "getPool",
-      args: [
-        tokenA.address as `0x${string}`,
-        tokenB.address as `0x${string}`,
-        fee,
-      ],
-    });
-
-    // Check if pool exists (non-zero address)
-    if (
-      !poolAddress ||
-      poolAddress === "0x0000000000000000000000000000000000000000"
-    ) {
-      return null;
-    }
-
-    return poolAddress as string;
-  } catch (error) {
-    console.error("Error checking if pool exists:", error);
-    return null;
-  }
-}
-
-/**
- * Get pool metadata (token0, token1, fee, liquidity, slot0)
- * Following the Uniswap V3 SDK docs pattern
- */
-async function getPoolConstants(poolAddress: string): Promise<{
-  token0: string;
-  token1: string;
-  fee: number;
-  liquidity: bigint;
-  sqrtPriceX96: bigint;
-  tick: number;
-} | null> {
-  try {
-    const [token0, token1, fee, liquidity, slot0] = await Promise.all([
-      publicClient.readContract({
-        address: poolAddress as `0x${string}`,
-        abi: Pool_ABI,
-        functionName: "token0",
-      }),
-      publicClient.readContract({
-        address: poolAddress as `0x${string}`,
-        abi: Pool_ABI,
-        functionName: "token1",
-      }),
-      publicClient.readContract({
-        address: poolAddress as `0x${string}`,
-        abi: Pool_ABI,
-        functionName: "fee",
-      }),
-      publicClient.readContract({
-        address: poolAddress as `0x${string}`,
-        abi: Pool_ABI,
-        functionName: "liquidity",
-      }),
-      publicClient.readContract({
-        address: poolAddress as `0x${string}`,
-        abi: Pool_ABI,
-        functionName: "slot0",
-      }),
-    ]);
-
-    // Handle slot0 as array (tuple)
-    const sqrtPriceX96 = Array.isArray(slot0)
-      ? (slot0[0] as bigint)
-      : (slot0 as any).sqrtPriceX96;
-    const tick = Array.isArray(slot0)
-      ? Number(slot0[1])
-      : Number((slot0 as any).tick);
-
-    return {
-      token0: token0 as string,
-      token1: token1 as string,
-      fee: Number(fee),
-      liquidity: liquidity as bigint,
-      sqrtPriceX96,
-      tick,
-    };
-  } catch (error) {
-    console.error("Error fetching pool constants:", error);
-    return null;
-  }
-}
-
-/**
- * Get quote using QuoterV2 contract
- * Following the Uniswap V3 SDK docs: https://docs.uniswap.org/sdk/v3/guides/swaps/quoting
- * 
- * Guide states: "QuoterV2 takes only one argument in the form of an object"
- * Guide example: quoteExactInputSingle({ tokenIn, tokenOut, fee, amountIn, sqrtPriceLimitX96 })
- * 
- * Guide states: "use the callStatic method... This is a useful method that submits 
- * a state-changing transaction to an Ethereum node, but asks the node to simulate the state change"
- * 
- * Returns: { amountOut, sqrtPriceX96After, initializedTicksCrossed, gasEstimate }
- */
-export async function getQuoteFromQuoterV2(
+async function getQuoteFromRouter(
   tokenIn: Token,
   tokenOut: Token,
   amountIn: string,
-  fee: FeeAmount
+  provider: JsonRpcProvider
 ): Promise<{
-  amountOut: bigint;
-  sqrtPriceX96After: bigint;
-  initializedTicksCrossed: number;
-  gasEstimate: bigint;
+  amountOut: string;
+  fee: number;
+  gasEstimate: string;
+  poolAddress: string;
+  route: any;
+  routePath: string[];
 } | null> {
   try {
-    // Following the guide: "fromReadableAmount() function creates the amount of the smallest unit"
-    // Convert amountIn to wei (smallest unit) using token decimals
-    const amountInWei = parseUnits(amountIn, tokenIn.decimals);
-
-    // Following the guide: "QuoterV2 takes only one argument in the form of an object"
-    // Guide shows: quoteExactInputSingle({ tokenIn, tokenOut, fee, amountIn, sqrtPriceLimitX96: 0 })
-    // Note: The actual ABI has params struct + separate tokenOut, but we structure it as the guide shows
-    
-    // Following the guide: "use the callStatic method... asks the node to simulate the state change"
-    // Guide states: "This is a useful method that submits a state-changing transaction to an Ethereum node,
-    // but asks the node to simulate the state change, rather than to execute it"
-    // In viem, we use publicClient.call() which simulates execution without state changes
-    const { encodeFunctionData, decodeFunctionResult } = await import("viem");
-    const data = encodeFunctionData({
-      abi: QuoterV2_ABI,
-      functionName: "quoteExactInputSingle",
-      args: [
-        {
-          // Following guide exactly: tokenIn.address, tokenOut.address, fee, amountIn, sqrtPriceLimitX96: 0
-          token: tokenIn.address as `0x${string}`, // tokenIn from guide
-          amountIn: amountInWei, // fromReadableAmount equivalent - amount in smallest unit
-          fee: fee, // fee from guide
-          sqrtPriceLimitX96: BigInt(0), // 0 means no price limit (as per guide)
-        },
-        tokenOut.address as `0x${string}`, // tokenOut from guide (ABI requires separate param)
-      ],
-    });
-
-    try {
-      // Following the guide: "callStatic method... simulates the state change"
-      // publicClient.call() simulates execution without actually executing
-      const result = await publicClient.call({
-        to: CONTRACTS.QuoterV2 as `0x${string}`,
-        data: data as `0x${string}`,
-      });
-
-      // If call succeeds and returns data, decode it
-      if (result.data && result.data !== "0x") {
-        const decoded = decodeFunctionResult({
-          abi: QuoterV2_ABI,
-          functionName: "quoteExactInputSingle",
-          data: result.data,
-        });
-
-        // Following the guide: Returns amountOut, sqrtPriceX96After, initializedTicksCrossed, gasEstimate
-        if (Array.isArray(decoded)) {
-          return {
-            amountOut: decoded[0] as bigint, // amountOut - tokens received
-            sqrtPriceX96After: decoded[1] as bigint, // sqrtPriceX96After - price after swap
-            initializedTicksCrossed: Number(decoded[2]), // initializedTicksCrossed - ticks crossed
-            gasEstimate: decoded[3] as bigint, // gasEstimate - estimated gas
-          };
-        }
-
-        if (decoded && typeof decoded === "object") {
-          return {
-            amountOut: (decoded as any).amountOut as bigint,
-            sqrtPriceX96After: (decoded as any).sqrtPriceX96After as bigint,
-            initializedTicksCrossed: Number(
-              (decoded as any).initializedTicksCrossed
-            ),
-            gasEstimate: (decoded as any).gasEstimate as bigint,
-          };
-        }
-      }
-    } catch (callError: any) {
-      // Following the guide: "the Uniswap V3 Quoter contracts rely on state-changing calls 
-      // designed to be reverted to return the desired data"
-      // QuoterV2 can revert with return data (successful quote) or without data (failed quote)
-      
-      // Try to extract return data from the revert
-      // In viem, revert data might be in different places depending on error type
-      let revertData: `0x${string}` | undefined;
-
-      if (callError?.data) {
-        revertData = callError.data as `0x${string}`;
-      } else if (callError?.cause?.data) {
-        revertData = callError.cause.data as `0x${string}`;
-      } else if (callError?.cause?.cause?.data) {
-        revertData = callError.cause.cause.data as `0x${string}`;
-      }
-
-      // If we have revert data, try to decode it (this is the successful quote case)
-      if (revertData && revertData !== "0x" && revertData.length > 2) {
-        try {
-          const { decodeFunctionResult } = await import("viem");
-          const decoded = decodeFunctionResult({
-            abi: QuoterV2_ABI,
-            functionName: "quoteExactInputSingle",
-            data: revertData,
-          });
-
-          if (Array.isArray(decoded)) {
-            return {
-              amountOut: decoded[0] as bigint,
-              sqrtPriceX96After: decoded[1] as bigint,
-              initializedTicksCrossed: Number(decoded[2]),
-              gasEstimate: decoded[3] as bigint,
-            };
-          }
-
-          if (decoded && typeof decoded === "object") {
-            return {
-              amountOut: (decoded as any).amountOut as bigint,
-              sqrtPriceX96After: (decoded as any).sqrtPriceX96After as bigint,
-              initializedTicksCrossed: Number(
-                (decoded as any).initializedTicksCrossed
-              ),
-              gasEstimate: (decoded as any).gasEstimate as bigint,
-            };
-          }
-        } catch (decodeError) {
-          // If decoding fails, it's likely a real revert (not return data)
-          // This is expected for pools without sufficient liquidity
-        }
-      }
-
-      // Following the guide: "If we try to get a quote on an output... from a Pool that only holds... 
-      // the function call will fail."
-      // If no return data or decode failed, it's a legitimate revert
-      // This means the swap would fail (e.g., insufficient liquidity)
-      // Return null silently - this is expected behavior
+    // Only run on client side
+    if (typeof window === 'undefined') {
       return null;
     }
+
+    // Get router instance
+    const router = await getRouterInstance(provider);
+    
+    // Get SwapType from router module
+    const routerModule = await import("@uniswap/smart-order-router/build/main");
+    const SwapType = routerModule.SwapType;
+
+    // Convert tokens to SDK tokens
+    const sdkTokenIn = tokenToSDKToken(tokenIn);
+    const sdkTokenOut = tokenToSDKToken(tokenOut);
+
+    // Create input amount
+    const rawTokenAmountIn = fromReadableAmount(parseFloat(amountIn), tokenIn.decimals || 18);
+    const amountInCurrency = TokenAmount(sdkTokenIn, rawTokenAmountIn.toString());
+
+    // Create swap options
+    const { Percent } = require("@uniswap/sdk-core");
+    const options = {
+      recipient: "0x0000000000000000000000000000000000000000", // Not needed for quote
+      slippageTolerance: new Percent(50, 10_000), // 0.5% default
+      deadline: Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes
+      type: SwapType?.SWAP_ROUTER_02 ?? 1, // SWAP_ROUTER_02 = 1
+    };
+
+    // Get route
+    console.log(`Finding route: ${tokenIn.symbol} -> ${tokenOut.symbol}`);
+    const route = await router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, options);
+
+    if (!route || !route.methodParameters) {
+      console.warn(`No route found for ${tokenIn.symbol} -> ${tokenOut.symbol}`);
+      return null;
+    }
+
+    // Extract quote information
+    const quote = route.quote;
+    const amountOut = quote.toExact();
+
+    // Debug: Log the route structure - log the full route object for inspection
+    console.log('Full route object:', route);
+    console.log('Route object structure:', {
+      hasRoute: !!route.route,
+      routeType: Array.isArray(route.route) ? 'array' : typeof route.route,
+      routeLength: Array.isArray(route.route) ? route.route.length : 'N/A',
+      routeKeys: Object.keys(route),
+      hasTrade: 'trade' in route,
+      hasTokenPath: 'tokenPath' in route,
+      firstRoute: route.route && Array.isArray(route.route) ? route.route[0] : null,
+    });
+    
+    // Check if route has a trade property with route information
+    if (route.trade) {
+      console.log('Route has trade property:', {
+        tradeType: typeof route.trade,
+        tradeKeys: Object.keys(route.trade),
+        hasRoutes: 'routes' in route.trade,
+        routes: route.trade.routes,
+      });
+    }
+    
+    // Try to extract path from route.tokenPath if available (some router versions have this)
+    if ('tokenPath' in route && Array.isArray((route as any).tokenPath)) {
+      const tokenPath = (route as any).tokenPath.map((t: any) => {
+        if (typeof t === 'string') return t.toLowerCase();
+        if (t?.address) return t.address.toLowerCase();
+        return null;
+      }).filter(Boolean) as string[];
+      
+      if (tokenPath.length > 0) {
+        console.log('Found tokenPath on route object:', tokenPath);
+        return {
+          amountOut,
+          fee: 0,
+          gasEstimate: route.estimatedGasUsed?.toString() || "0",
+          poolAddress: "",
+          route: route.route,
+          routePath: tokenPath,
+        };
+      }
+    }
+
+    // Extract route path and pool information
+    let poolAddress = "";
+    let fee = 0;
+    const routePath: string[] = [tokenIn.address.toLowerCase()]; // Start with input token
+    
+    // Try multiple extraction methods
+    
+    // Method 1: Try route.trade.routes (newer router versions)
+    if (route.trade && route.trade.routes && Array.isArray(route.trade.routes) && route.trade.routes.length > 0) {
+      console.log('Found route.trade.routes, extracting path...');
+      const firstTradeRoute = route.trade.routes[0] as any;
+      
+      // Try route.trade.routes[0].path first (direct property - THIS IS THE ONE!)
+      if (firstTradeRoute?.path && Array.isArray(firstTradeRoute.path)) {
+        console.log('Found firstTradeRoute.path, extracting...', firstTradeRoute.path);
+        const tokenPath = firstTradeRoute.path.map((t: any) => {
+          // Token objects from SDK have address property
+          if (t?.address) {
+            return t.address.toLowerCase();
+          }
+          // Fallback for string addresses
+          if (typeof t === 'string') {
+            return t.toLowerCase();
+          }
+          console.warn('Unknown token format in path:', t);
+          return null;
+        }).filter(Boolean) as string[];
+        
+        if (tokenPath.length > 0) {
+          console.log('✅ Extracted path from route.trade.routes[0].path:', tokenPath);
+          routePath.length = 0;
+          routePath.push(...tokenPath);
+        } else {
+          console.warn('Failed to extract path from firstTradeRoute.path');
+        }
+      }
+      
+      // Fallback: Try route.trade.routes[0].tokenPath (direct property)
+      if (routePath.length <= 1 && firstTradeRoute?.tokenPath && Array.isArray(firstTradeRoute.tokenPath)) {
+        console.log('Trying firstTradeRoute.tokenPath as fallback...', firstTradeRoute.tokenPath);
+        const tokenPath = firstTradeRoute.tokenPath.map((t: any) => {
+          if (t?.address) {
+            return t.address.toLowerCase();
+          }
+          if (typeof t === 'string') {
+            return t.toLowerCase();
+          }
+          return null;
+        }).filter(Boolean) as string[];
+        
+        if (tokenPath.length > 0) {
+          console.log('✅ Extracted path from route.trade.routes[0].tokenPath:', tokenPath);
+          routePath.length = 0;
+          routePath.push(...tokenPath);
+        }
+      }
+      
+      // Try extracting from pools in trade route
+      if (routePath.length <= 1 && firstTradeRoute?.pools && Array.isArray(firstTradeRoute.pools)) {
+        console.log('Extracting from route.trade.routes[0].pools...');
+        routePath.length = 0;
+        routePath.push(tokenIn.address.toLowerCase());
+        let currentToken = tokenIn.address.toLowerCase();
+        
+        for (const pool of firstTradeRoute.pools) {
+          const token0 = pool.token0?.address?.toLowerCase() || 
+                       (typeof pool.token0 === 'string' ? pool.token0.toLowerCase() : null);
+          const token1 = pool.token1?.address?.toLowerCase() || 
+                       (typeof pool.token1 === 'string' ? pool.token1.toLowerCase() : null);
+          
+          if (token0 && token1) {
+            const nextToken = currentToken === token0 ? token1 : 
+                            currentToken === token1 ? token0 : null;
+            
+            if (nextToken && !routePath.includes(nextToken)) {
+              routePath.push(nextToken);
+              currentToken = nextToken;
+            }
+          }
+        }
+        
+        const tokenOutLower = tokenOut.address.toLowerCase();
+        if (routePath[routePath.length - 1] !== tokenOutLower) {
+          routePath.push(tokenOutLower);
+        }
+        
+        if (routePath.length > 1) {
+          console.log('Extracted path from route.trade.routes[0].pools:', routePath);
+        }
+      }
+    }
+    
+    // Fallback to route.route structure
+    if (route.route && Array.isArray(route.route) && route.route.length > 0) {
+      const firstRoute = route.route[0] as any;
+      
+      // Debug: Log first route structure
+      console.log('First route structure:', {
+        hasPools: 'pools' in firstRoute,
+        poolsLength: firstRoute?.pools?.length || 0,
+        hasPath: 'path' in firstRoute,
+        pathType: firstRoute?.path ? (Array.isArray(firstRoute.path) ? 'array' : typeof firstRoute.path) : 'none',
+        routeKeys: Object.keys(firstRoute || {}),
+      });
+      
+      // Check if it's a V3 route
+      if (firstRoute && 'pools' in firstRoute && firstRoute.pools && Array.isArray(firstRoute.pools)) {
+        // Try to extract path from route.path if available (most reliable)
+        if (firstRoute.path && Array.isArray(firstRoute.path)) {
+          routePath.length = 0; // Reset
+          routePath.push(...firstRoute.path.map((t: any) => {
+            if (typeof t === 'string') return t.toLowerCase();
+            if (t?.address) return t.address.toLowerCase();
+            return null;
+          }).filter(Boolean) as string[]);
+          console.log('Extracted path from route.path:', routePath);
+        } else {
+          // Fallback: Extract token path from pools (multi-hop support)
+          routePath.length = 0; // Reset to rebuild from pools
+          routePath.push(tokenIn.address.toLowerCase()); // Start with input token
+          let currentToken = tokenIn.address.toLowerCase();
+          
+          console.log('Extracting path from pools, starting with:', currentToken);
+          
+          for (let i = 0; i < firstRoute.pools.length; i++) {
+            const pool = firstRoute.pools[i];
+            
+            // Debug: Log pool structure
+            if (i === 0) {
+              console.log('First pool structure:', {
+                hasToken0: 'token0' in pool,
+                hasToken1: 'token1' in pool,
+                token0Type: typeof pool.token0,
+                token1Type: typeof pool.token1,
+                poolKeys: Object.keys(pool),
+              });
+            }
+            
+            // Try different property names for tokens
+            const token0 = pool.token0?.address?.toLowerCase() || 
+                         pool.tokenA?.address?.toLowerCase() ||
+                         (typeof pool.token0 === 'string' ? pool.token0.toLowerCase() : null);
+            const token1 = pool.token1?.address?.toLowerCase() || 
+                         pool.tokenB?.address?.toLowerCase() ||
+                         (typeof pool.token1 === 'string' ? pool.token1.toLowerCase() : null);
+            
+            console.log(`Pool ${i}: token0=${token0}, token1=${token1}, currentToken=${currentToken}`);
+            
+            if (token0 && token1) {
+              // Find which token is the output (not the current token)
+              const nextToken = currentToken === token0 ? token1 : 
+                              currentToken === token1 ? token0 : null;
+              
+              if (nextToken) {
+                if (!routePath.includes(nextToken)) {
+                  routePath.push(nextToken);
+                  console.log(`Added token to path: ${nextToken}, path now:`, routePath);
+                }
+                currentToken = nextToken;
+              }
+            }
+          }
+          
+          // Ensure output token is in the path
+          const tokenOutLower = tokenOut.address.toLowerCase();
+          if (routePath[routePath.length - 1] !== tokenOutLower) {
+            routePath.push(tokenOutLower);
+            console.log('Added output token to path:', tokenOutLower);
+          }
+          
+          console.log('Final path extracted from pools:', routePath);
+        }
+        
+        // Extract fee from first pool
+        if (firstRoute.pools.length > 0) {
+          const firstPool = firstRoute.pools[0];
+          fee = firstPool.fee || firstPool.feeTier || 0;
+          
+          // Get pool address if available
+          if (firstPool.poolAddress) {
+            poolAddress = firstPool.poolAddress;
+          } else if (firstPool.address) {
+            poolAddress = firstPool.address;
+          }
+        }
+      } else if (firstRoute && 'path' in firstRoute) {
+        // V2 route - extract path directly
+        if (Array.isArray(firstRoute.path)) {
+          routePath.length = 0; // Reset
+          routePath.push(...firstRoute.path.map((t: any) => 
+            (typeof t === 'string' ? t : t.address)?.toLowerCase()
+          ).filter(Boolean));
+        }
+      }
+    }
+
+    // Ensure we always have at least input and output tokens
+    const tokenInLower = tokenIn.address.toLowerCase();
+    const tokenOutLower = tokenOut.address.toLowerCase();
+    
+    if (routePath.length === 1 && routePath[0] === tokenInLower) {
+      // Only input token found, add output token
+      routePath.push(tokenOutLower);
+      console.log('Added output token to path (fallback):', routePath);
+    } else if (routePath.length > 1 && routePath[routePath.length - 1] !== tokenOutLower) {
+      // Path exists but doesn't end with output token
+      routePath.push(tokenOutLower);
+      console.log('Added output token to end of path:', routePath);
+    }
+
+    // Get gas estimate
+    const gasEstimate = route.estimatedGasUsed?.toString() || "0";
+
+    // Log route information for debugging
+    console.log('Route found:', {
+      hops: routePath.length - 1,
+      path: routePath,
+      amountOut,
+      pools: route.route?.[0]?.pools?.length || route.trade?.routes?.[0]?.route?.pools?.length || 0,
+      routeStructure: route.route ? 'route.route' : route.trade ? 'route.trade' : 'unknown'
+    });
+
+    return {
+      amountOut,
+      fee,
+      gasEstimate,
+      poolAddress,
+      route: route.route,
+      routePath, // Add extracted path
+    };
   } catch (error) {
-    // Only log unexpected errors, not expected reverts
-    // Expected reverts (no liquidity, etc.) are handled above
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (
-      !errorMessage.includes("revert") &&
-      !errorMessage.includes("Execution reverted")
-    ) {
-      console.error("Unexpected error getting quote from QuoterV2:", error);
+    console.error("Error getting quote from router:", error);
+    // Log more details about the error for debugging
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
     }
     return null;
   }
 }
 
 /**
- * Find the best pool and get quote for a token pair
- * Checks multiple fee tiers and returns the best quote
- * Falls back to SDK-based quotes if QuoterV2 fails
+ * React hook for getting swap quotes using Smart Order Router
  */
-async function getBestQuote(
-  tokenIn: Token,
-  tokenOut: Token,
-  amountIn: string
-): Promise<{
-  amountOut: string;
-  fee: FeeAmount;
-  gasEstimate: string;
-  poolAddress: string;
-} | null> {
-  const sdkTokenIn = tokenToSDKToken(tokenIn);
-  const sdkTokenOut = tokenToSDKToken(tokenOut);
-
-  // Try all fee tiers to find the best route
-  const feeTiers = [
-    100,
-    FeeAmount.LOW,
-    FeeAmount.MEDIUM,
-    FeeAmount.HIGH,
-  ] as FeeAmount[];
-
-  let bestQuote: {
-    amountOut: bigint;
-    fee: FeeAmount;
-    gasEstimate: bigint;
-    poolAddress: string;
-  } | null = null;
-
-  // First try QuoterV2 for each fee tier
-  for (const fee of feeTiers) {
-    try {
-      // First check if pool exists by querying the Factory contract
-      const poolAddress = await checkPoolExists(sdkTokenIn, sdkTokenOut, fee);
-      if (!poolAddress) {
-        continue;
-      }
-
-      // Verify pool has liquidity by fetching its constants
-      const poolConstants = await getPoolConstants(poolAddress);
-      if (!poolConstants || poolConstants.liquidity === BigInt(0)) {
-        continue;
-      }
-
-      // Get quote from QuoterV2
-      const quote = await getQuoteFromQuoterV2(
-        tokenIn,
-        tokenOut,
-        amountIn,
-        fee
-      );
-      if (!quote) {
-        continue;
-      }
-
-      // Keep track of the best quote (highest amountOut)
-      if (!bestQuote || quote.amountOut > bestQuote.amountOut) {
-        bestQuote = {
-          amountOut: quote.amountOut,
-          fee: fee,
-          gasEstimate: quote.gasEstimate,
-          poolAddress: poolAddress,
-        };
-      }
-    } catch (error) {
-      // Continue to next fee tier
-      continue;
-    }
-  }
-
-  // If QuoterV2 didn't work, fall back to SDK-based quotes
-  if (!bestQuote) {
-    console.log("QuoterV2 failed, falling back to SDK-based quotes");
-    try {
-      const { createTrade } = await import("@/lib/sdk-utils");
-      const tradeResult = await createTrade(
-        tokenIn,
-        tokenOut,
-        amountIn,
-        feeTiers
-      );
-
-      if (tradeResult && tradeResult.trade && tradeResult.trade.outputAmount) {
-        // Convert SDK trade output to bigint for consistency
-        const amountOutWei = BigInt(
-          tradeResult.trade.outputAmount.quotient.toString()
-        );
-        const gasEstimate = BigInt(150000); // Estimated gas for SDK-based quotes
-
-        console.log("SDK-based quote successful:", {
-          amountOut: tradeResult.trade.outputAmount.toExact(),
-          fee: tradeResult.fee,
-          poolAddress: tradeResult.poolAddress,
-        });
-
-        bestQuote = {
-          amountOut: amountOutWei,
-          fee: tradeResult.fee,
-          gasEstimate: gasEstimate,
-          poolAddress: tradeResult.poolAddress,
-        };
-      } else {
-        console.log("SDK-based quote also failed - no valid trade found");
-      }
-    } catch (error) {
-      console.error("Error getting SDK-based quote:", error);
-    }
-  } else {
-    console.log("QuoterV2 quote successful:", {
-      amountOut: formatUnits(bestQuote.amountOut, tokenOut.decimals),
-      fee: bestQuote.fee,
-    });
-  }
-
-  if (!bestQuote) {
-    return null;
-  }
-
-  return {
-    amountOut: formatUnits(bestQuote.amountOut, tokenOut.decimals),
-    fee: bestQuote.fee,
-    gasEstimate: bestQuote.gasEstimate.toString(),
-    poolAddress: bestQuote.poolAddress,
-  };
-}
-
 export function useSwapQuote(
   tokenIn: Token | null,
   tokenOut: Token | null,
@@ -431,9 +382,28 @@ export function useSwapQuote(
   const [quote, setQuote] = useState<SwapQuote | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const publicClient = usePublicClient();
+
+  // Create provider from publicClient (only on client side)
+  const provider = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    if (!publicClient) return null;
+    // Convert viem PublicClient to ethers JsonRpcProvider
+    try {
+      return new JsonRpcProvider(RPC_URL);
+    } catch (error) {
+      console.error('Failed to create provider:', error);
+      return null;
+    }
+  }, [publicClient]);
 
   useEffect(() => {
-    if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0) {
+    // Only run on client side
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0 || !provider) {
       setQuote(null);
       setIsLoading(false);
       setError(null);
@@ -447,7 +417,7 @@ export function useSwapQuote(
       setError(null);
 
       try {
-        const quoteResult = await getBestQuote(tokenIn, tokenOut, amountIn);
+        const quoteResult = await getQuoteFromRouter(tokenIn, tokenOut, amountIn, provider);
 
         if (cancelled) return;
 
@@ -464,13 +434,25 @@ export function useSwapQuote(
         // For now, we'll set it to 0 and calculate it properly when we have trade data
         const priceImpact = 0;
 
+        // Use extracted route path if available, otherwise fallback to direct path
+        const routePath = quoteResult.routePath && quoteResult.routePath.length > 0
+          ? quoteResult.routePath
+          : [tokenIn.address.toLowerCase(), tokenOut.address.toLowerCase()];
+
+        console.log('Setting quote with route:', {
+          routePath,
+          routePathLength: routePath.length,
+          hasRoutePath: !!quoteResult.routePath,
+          originalRoutePath: quoteResult.routePath,
+        });
+
         setQuote({
           amountOut: quoteResult.amountOut,
           price,
           priceImpact,
           fee: quoteResult.fee,
           gasEstimate: quoteResult.gasEstimate,
-          route: [tokenIn.address, tokenOut.address],
+          route: routePath, // Use extracted multi-hop path
           poolAddress: quoteResult.poolAddress,
         });
       } catch (err) {
@@ -492,7 +474,86 @@ export function useSwapQuote(
     return () => {
       cancelled = true;
     };
-  }, [tokenIn, tokenOut, amountIn]);
+  }, [tokenIn, tokenOut, amountIn, provider]);
 
   return { data: quote, isLoading, error };
+}
+
+/**
+ * Get router route for swap execution
+ * Following execute-swap-sdk.js pattern for getting route
+ */
+export async function getRouterRoute(
+  tokenIn: Token,
+  tokenOut: Token,
+  amountIn: string,
+  slippageTolerance: number,
+  deadlineMinutes: number,
+  recipient: string,
+  provider: JsonRpcProvider
+): Promise<{
+  route: any;
+  methodParameters: any;
+  quote: CurrencyAmount<any>;
+} | null> {
+  try {
+    // Only run on client side
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    // Get router instance
+    const router = await getRouterInstance(provider);
+    
+    // Get SwapType from router module
+    const routerModule = await import("@uniswap/smart-order-router/build/main");
+    const SwapType = routerModule.SwapType;
+
+    // Convert tokens to SDK tokens
+    const sdkTokenIn = tokenToSDKToken(tokenIn);
+    const sdkTokenOut = tokenToSDKToken(tokenOut);
+
+    // Create input amount
+    const rawTokenAmountIn = fromReadableAmount(parseFloat(amountIn), tokenIn.decimals || 18);
+    const amountInCurrency = TokenAmount(sdkTokenIn, rawTokenAmountIn.toString());
+
+    // Create swap options
+    const { Percent } = require("@uniswap/sdk-core");
+    const options = {
+      recipient,
+      slippageTolerance: new Percent(Math.floor(slippageTolerance * 100), 10_000),
+      deadline: Math.floor(Date.now() / 1000) + 60 * deadlineMinutes,
+      type: SwapType?.SWAP_ROUTER_02 ?? 1, // SWAP_ROUTER_02 = 1
+    };
+
+    // Get route - the router automatically finds multi-hop routes
+    console.log(`Getting route for execution: ${tokenIn.symbol} -> ${tokenOut.symbol}`);
+    const route = await router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, options);
+
+    if (!route || !route.methodParameters) {
+      console.warn(`No route found for execution: ${tokenIn.symbol} -> ${tokenOut.symbol}`);
+      return null;
+    }
+
+    // Log route information for debugging
+    if (route.route && Array.isArray(route.route) && route.route.length > 0) {
+      const firstRoute = route.route[0] as any;
+      const poolCount = firstRoute?.pools?.length || 0;
+      console.log(`Route found for execution: ${poolCount} pool(s) in path`);
+    }
+
+    return {
+      route,
+      methodParameters: route.methodParameters,
+      quote: route.quote,
+    };
+  } catch (error) {
+    console.error("Error getting router route:", error);
+    // Log more details about the error for debugging
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
+    return null;
+  }
 }

@@ -7,15 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "postinstall": "node scripts/patch-token-lists.js"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
-    "@uniswap/sdk-core": "^4.0.7",
-    "@uniswap/smart-order-router": "^3.10.0",
-    "@uniswap/v3-sdk": "^3.10.0",
+    "@uniswap/sdk-core": "^7.10.0",
+    "@uniswap/smart-order-router": "^4.31.0",
+    "@uniswap/v3-sdk": "^3.27.0",
     "clsx": "^2.0.0",
-    "ethers": "^6.8.0",
+    "ethers": "^5.7.2",
     "graphql": "^16.12.0",
     "graphql-request": "^7.4.0",
     "lucide-react": "^0.294.0",

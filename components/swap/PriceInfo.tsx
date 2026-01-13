@@ -1,19 +1,64 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Token } from '@/types/token';
 import { SwapQuote } from '@/types/swap';
-import { formatNumber } from '@/lib/utils';
-import { Info } from 'lucide-react';
+import { formatNumber, formatBalance } from '@/lib/utils';
+import { Info, AlertTriangle } from 'lucide-react';
+import { calculatePriceImpact, calculateSuggestedSlippage, calculateOptimalSwapSize } from '@/lib/swap-utils';
+import { usePoolDetails } from '@/hooks/usePoolDetails';
+import { RouteDisplay } from './RouteDisplay';
 
 interface PriceInfoProps {
   quote: SwapQuote;
   tokenIn: Token;
   tokenOut: Token;
   slippage: number;
+  amountIn: string;
 }
 
-export function PriceInfo({ quote, tokenIn, tokenOut, slippage }: PriceInfoProps) {
-  const priceImpact = quote.priceImpact || 0;
+export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: PriceInfoProps) {
+  const [priceImpact, setPriceImpact] = useState<number>(quote.priceImpact || 0);
+  const [optimalSwapSize, setOptimalSwapSize] = useState<string | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const { pool } = usePoolDetails(quote.poolAddress || '');
+
+  useEffect(() => {
+    const calculateImpact = async () => {
+      if (!quote.poolAddress || !amountIn || !quote.amountOut || parseFloat(amountIn) <= 0) {
+        return;
+      }
+
+      setIsCalculating(true);
+      try {
+        const impact = await calculatePriceImpact(
+          amountIn,
+          quote.amountOut,
+          tokenIn,
+          tokenOut,
+          quote.poolAddress,
+          quote.fee
+        );
+        setPriceImpact(impact);
+
+        // Calculate optimal swap size
+        const optimal = await calculateOptimalSwapSize(
+          quote.poolAddress,
+          tokenIn,
+          tokenOut,
+          quote.fee
+        );
+        setOptimalSwapSize(optimal);
+      } catch (error) {
+        console.error('Error calculating price impact:', error);
+      } finally {
+        setIsCalculating(false);
+      }
+    };
+
+    calculateImpact();
+  }, [amountIn, quote.amountOut, quote.poolAddress, quote.fee, tokenIn, tokenOut]);
+
   const minAmountOut = quote.amountOut
     ? (() => {
         const amount = parseFloat(quote.amountOut) * (1 - slippage / 100);
@@ -24,8 +69,20 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage }: PriceInfoProps
       })()
     : '0';
 
+  const suggestedSlippage = priceImpact > 0 ? calculateSuggestedSlippage(priceImpact) : slippage;
+  const slippageInsufficient = priceImpact > slippage * 0.8; // Warn if price impact is >80% of slippage
+
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-2 text-sm">
+    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-3 text-sm">
+      {/* Route Display */}
+      {quote.route && quote.route.length > 0 && (
+        <RouteDisplay
+          route={quote.route}
+          tokenIn={tokenIn}
+          tokenOut={tokenOut}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <span className="text-gray-600 dark:text-gray-400">Price</span>
         <span className="font-medium">
@@ -39,27 +96,82 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage }: PriceInfoProps
         </span>
       </div>
 
+      {/* Pool Liquidity */}
+      {pool && (
+        <div className="flex items-center justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Pool Liquidity</span>
+          <span className="font-medium">
+            {pool.tvl > 0 
+              ? `$${formatBalance(pool.tvl, 2)}`
+              : 'Low'}
+          </span>
+        </div>
+      )}
+
+      {/* Price Impact */}
       <div className="flex items-center justify-between">
         <span className="text-gray-600 dark:text-gray-400">Price Impact</span>
         <span
           className={`font-medium ${
-            priceImpact > 3
+            priceImpact > 5
               ? 'text-red-600 dark:text-red-400'
-              : priceImpact > 1
+              : priceImpact > 3
               ? 'text-yellow-600 dark:text-yellow-400'
               : ''
           }`}
         >
-          {formatNumber(priceImpact, 2)}%
+          {isCalculating ? '...' : formatNumber(priceImpact, 2)}%
         </span>
       </div>
 
-      {priceImpact > 3 && (
+      {/* Warnings */}
+      {priceImpact > 5 && (
+        <div className="flex items-start space-x-2 p-2 bg-red-50 dark:bg-red-900/20 rounded text-red-800 dark:text-red-200">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div className="text-xs space-y-1">
+            <div className="font-semibold">Very High Price Impact!</div>
+            <div>This trade will result in significant price movement. Consider using a smaller amount.</div>
+            {suggestedSlippage > slippage && (
+              <div>Recommended slippage: {suggestedSlippage.toFixed(1)}%</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {priceImpact > 3 && priceImpact <= 5 && (
         <div className="flex items-start space-x-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-yellow-800 dark:text-yellow-200">
           <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span className="text-xs">
             High price impact! This trade will result in significant price movement.
           </span>
+        </div>
+      )}
+
+      {slippageInsufficient && priceImpact > 0 && (
+        <div className="flex items-start space-x-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded text-orange-800 dark:text-orange-200">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div className="text-xs space-y-1">
+            <div className="font-semibold">Slippage may be insufficient</div>
+            <div>
+              Price impact ({priceImpact.toFixed(2)}%) is close to your slippage tolerance ({slippage}%).
+            </div>
+            {suggestedSlippage > slippage && (
+              <div>Consider increasing slippage to {suggestedSlippage.toFixed(1)}%</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Optimal Swap Size Suggestion */}
+      {optimalSwapSize && parseFloat(amountIn) > parseFloat(optimalSwapSize) * 1.2 && (
+        <div className="flex items-start space-x-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-800 dark:text-blue-200">
+          <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div className="text-xs">
+            <div className="font-semibold">Swap size suggestion</div>
+            <div>
+              For better price execution, consider swapping {optimalSwapSize} {tokenIn.symbol} or less.
+            </div>
+          </div>
         </div>
       )}
 
