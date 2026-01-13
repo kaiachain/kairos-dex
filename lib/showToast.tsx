@@ -1,15 +1,19 @@
 'use client';
 
-import { ReactNode, FunctionComponent, SVGProps, MouseEventHandler } from 'react';
-import { toast, Id } from 'react-toastify';
+import { ReactNode, FunctionComponent, SVGProps, MouseEventHandler, useMemo } from 'react';
+import { toast } from 'react-toastify';
 import { Toast } from '@/components/common/Toast';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
 
-const MIN_AUTO_CLOSE = 3000; // 3 seconds
-const DURATION_PER_CHAR = 66; // milliseconds per character
+// Constants
+const MIN_AUTO_CLOSE_MS = 3000;
+const DURATION_PER_CHAR_MS = 66;
+const MAX_AUTO_CLOSE_MS = 10000;
 
-export type ShowToastProps = {
-  type: 'confirm' | 'error' | 'info' | 'warning';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
+export interface ShowToastProps {
+  type: ToastType | 'confirm'; // 'confirm' is an alias for 'success'
   Icon?: FunctionComponent<SVGProps<SVGSVGElement>>;
   isClosable?: boolean;
   onClose?: () => void;
@@ -20,30 +24,97 @@ export type ShowToastProps = {
   title?: ReactNode;
   description?: ReactNode;
   bottomText?: ReactNode;
-  onBottomText?: MouseEventHandler<HTMLDivElement>;
+  onBottomText?: MouseEventHandler<HTMLButtonElement>;
   containerId?: string;
-};
-
-// Default icons based on type
-const getDefaultIcon = (type: ShowToastProps['type']) => {
-  switch (type) {
-    case 'confirm':
-      return CheckCircle2;
-    case 'error':
-    case 'warning':
-      return AlertCircle;
-    case 'info':
-      return Info;
-    default:
-      return Info;
-  }
-};
-
-// Calculate auto-close duration based on text length
-function calcAutoClose(textLength: number): number {
-  return Math.max(MIN_AUTO_CLOSE, textLength * DURATION_PER_CHAR);
 }
 
+// Icon mapping
+const DEFAULT_ICONS: Record<ToastType, FunctionComponent<SVGProps<SVGSVGElement>>> = {
+  success: CheckCircle2,
+  error: AlertCircle,
+  warning: AlertCircle,
+  info: Info,
+};
+
+// Icon color classes mapping
+const ICON_COLOR_CLASSES: Record<ToastType, string> = {
+  success: 'toast-icon-success',
+  error: 'toast-icon-error',
+  warning: 'toast-icon-warning',
+  info: 'toast-icon-info',
+};
+
+/**
+ * Normalizes toast type (converts 'confirm' to 'success')
+ */
+function normalizeToastType(type: ShowToastProps['type']): ToastType {
+  return type === 'confirm' ? 'success' : type;
+}
+
+/**
+ * Gets the appropriate icon for the toast type
+ */
+function getToastIcon(
+  type: ShowToastProps['type'],
+  customIcon?: FunctionComponent<SVGProps<SVGSVGElement>>
+): FunctionComponent<SVGProps<SVGSVGElement>> {
+  if (customIcon) return customIcon;
+  const normalizedType = normalizeToastType(type);
+  return DEFAULT_ICONS[normalizedType];
+}
+
+/**
+ * Calculates auto-close duration based on content length
+ */
+function calculateAutoCloseDuration(content: string): number {
+  const calculated = Math.max(MIN_AUTO_CLOSE_MS, content.length * DURATION_PER_CHAR_MS);
+  return Math.min(calculated, MAX_AUTO_CLOSE_MS);
+}
+
+/**
+ * Extracts text content from React nodes for length calculation
+ */
+function extractTextContent(...nodes: (ReactNode | undefined)[]): string {
+  return nodes
+    .filter(Boolean)
+    .map((node) => {
+      if (typeof node === 'string') return node;
+      if (typeof node === 'number') return String(node);
+      // For React elements, try to extract text (simplified)
+      return '';
+    })
+    .join(' ');
+}
+
+/**
+ * Determines the container ID based on props
+ */
+function getContainerId(
+  containerId?: string,
+  isClaim?: boolean,
+  isScannerDetail?: boolean
+): string | undefined {
+  if (containerId) return containerId;
+  if (isClaim) return 'claim';
+  if (isScannerDetail) return 'scanner';
+  return undefined;
+}
+
+/**
+ * Calculates the auto-close value
+ */
+function getAutoCloseValue(
+  autoClose: boolean | number | undefined,
+  contentLength: number
+): number | false {
+  if (autoClose === false) return false;
+  if (typeof autoClose === 'number') return autoClose;
+  return calculateAutoCloseDuration('x'.repeat(contentLength));
+}
+
+/**
+ * Main function to show a toast notification
+ */
 export function showToast(props: ShowToastProps): string | undefined {
   const {
     type,
@@ -61,55 +132,32 @@ export function showToast(props: ShowToastProps): string | undefined {
     containerId,
   } = props;
 
-  // Return early if both title and description are empty
+  // Early return if no content
   if (!title && !description) {
     return undefined;
   }
 
-  // Get icon
-  const ToastIcon = Icon || getDefaultIcon(type);
+  // Normalize type and get icon
+  const normalizedType = normalizeToastType(type);
+  const ToastIcon = getToastIcon(type, Icon);
+  const iconColorClass = ICON_COLOR_CLASSES[normalizedType];
 
-  // Map confirm to success for react-toastify
-  const toastType = type === 'confirm' ? 'success' : type;
-
-  // Calculate text length for auto-close
-  const textContent = [title, description, bottomText]
-    .filter(Boolean)
-    .map((text) => (typeof text === 'string' ? text : ''))
-    .join(' ');
-  const textLength = textContent.length;
+  // Calculate content length for auto-close
+  const textContent = extractTextContent(title, description, bottomText);
+  const autoCloseValue = getAutoCloseValue(autoClose, textContent.length);
 
   // Determine container ID
-  let finalContainerId = containerId;
-  if (isClaim) {
-    finalContainerId = 'claim';
-  } else if (isScannerDetail) {
-    finalContainerId = 'scanner';
-  }
+  const finalContainerId = getContainerId(containerId, isClaim, isScannerDetail);
 
-  // Get icon color based on type
-  const getIconColor = () => {
-    switch (type) {
-      case 'confirm':
-        return 'var(--success)';
-      case 'error':
-        return 'var(--error)';
-      case 'warning':
-        return 'var(--secondary)';
-      case 'info':
-        return 'var(--success)'; // Info uses success color in this design
-      default:
-        return 'var(--text-primary)';
-    }
-  };
-
-  // Render toast content - aligned with codebase design
+  // Render toast content with new design
   const toastContent = (
-    <div className="flex items-start gap-2" data-size={size}>
-      <div className="flex-shrink-0 mt-0.5">
-        <ToastIcon className="w-5 h-5" style={{ color: getIconColor() }} />
+    <div className="toast-layout" data-size={size} data-type={normalizedType}>
+      <div className="toast-icon-container">
+        <div className="toast-icon-badge">
+          <ToastIcon className={`toast-icon ${iconColorClass}`} aria-hidden="true" />
+        </div>
       </div>
-      <div className="flex-1">
+      <div className="toast-text-container">
         <Toast
           title={title}
           description={description}
@@ -117,40 +165,40 @@ export function showToast(props: ShowToastProps): string | undefined {
           onBottomText={onBottomText}
         />
       </div>
+      <div className="toast-accent-bar" data-type={normalizedType}></div>
     </div>
   );
 
-  // Calculate auto-close duration upfront
-  let initialAutoClose: number | false = false;
-  if (autoClose !== false) {
-    initialAutoClose = autoClose === true ? calcAutoClose(textLength) : autoClose;
-  }
-
-  // Show toast with auto-close
-  const toastId = toast[toastType](toastContent, {
-    autoClose: initialAutoClose || false, // Explicitly set autoClose
+  // Show toast
+  const toastId = toast[normalizedType](toastContent, {
+    autoClose: autoCloseValue,
     closeButton: isClosable,
     containerId: finalContainerId,
     onClose,
-    icon: false, // We're using custom icon in content
+    icon: false,
   });
 
-  // Update toast with size attribute and ensure auto-close after render
-  if (toastId) {
-    setTimeout(() => {
-      // Set size attribute
+  // Add size class to toast element after DOM insertion
+  // Using a small delay ensures the toast is in the DOM
+  if (toastId && typeof toastId === 'string') {
+    // Try immediate application first
+    const applySizeClass = () => {
       const toastElement = document.querySelector(`[id="${toastId}"]`);
       if (toastElement) {
-        toastElement.setAttribute('data-size', size);
+        toastElement.classList.add(`toast-size-${size}`);
+        return true;
       }
+      return false;
+    };
 
-      // Ensure auto-close is set correctly (update if needed)
-      if (initialAutoClose && initialAutoClose !== false) {
-        toast.update(toastId, {
-          autoClose: initialAutoClose,
-        });
-      }
-    }, 100); // Small delay to ensure toast is rendered
+    // Try immediately, fallback to next frame, then small timeout
+    if (!applySizeClass()) {
+      requestAnimationFrame(() => {
+        if (!applySizeClass()) {
+          setTimeout(applySizeClass, 50);
+        }
+      });
+    }
   }
 
   return typeof toastId === 'string' ? toastId : undefined;

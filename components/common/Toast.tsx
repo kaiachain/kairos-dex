@@ -1,33 +1,37 @@
 'use client';
 
-import { ReactNode, MouseEventHandler } from 'react';
+import { ReactNode, MouseEventHandler, memo } from 'react';
 
 export interface ToastProps {
   title?: ReactNode;
   description?: ReactNode;
   bottomText?: ReactNode;
-  onBottomText?: MouseEventHandler<HTMLDivElement>;
+  onBottomText?: MouseEventHandler<HTMLButtonElement>;
 }
 
-export function Toast({ title, description, bottomText, onBottomText }: ToastProps) {
+export const Toast = memo(function Toast({ title, description, bottomText, onBottomText }: ToastProps) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="toast-content-inner">
       {title && (
-        <div className="font-semibold text-base text-text-primary">{title}</div>
+        <h3 className="toast-title" role="heading" aria-level={3}>
+          {title}
+        </h3>
       )}
       {description && (
-        <div className="font-normal text-base text-text-secondary max-h-[200px] overflow-y-auto">
+        <p className="toast-description" role="status">
           {description}
-        </div>
+        </p>
       )}
       {bottomText && (
-        <div
+        <button
+          type="button"
           onClick={onBottomText}
-          className="mt-2 underline cursor-pointer text-text-primary hover:opacity-80 transition-opacity"
+          className="toast-action-button"
+          aria-label={typeof bottomText === 'string' ? bottomText : 'Action'}
         >
           {bottomText}
-        </div>
+        </button>
       )}
     </div>
   );
-}
+});
