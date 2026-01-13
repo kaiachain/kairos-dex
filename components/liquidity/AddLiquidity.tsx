@@ -774,8 +774,8 @@ export function AddLiquidity({
   };
 
   return (
-    <div className="bg-white dark:bg-card rounded-2xl shadow-lg p-6 border border-border max-w-2xl">
-      <h2 className="text-2xl font-bold mb-6 text-text-primary">Add Liquidity</h2>
+    <div className="bg-white dark:bg-card rounded-3xl shadow-lg p-6 border border-border w-full">
+      <h2 className="text-2xl font-semibold mb-6 text-text-primary">Add Liquidity</h2>
 
       <div className="space-y-6">
         {/* Pool Selector - shown when coming from Positions page */}

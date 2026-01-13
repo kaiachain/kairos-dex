@@ -2,30 +2,14 @@
 
 import { usePositions } from "@/hooks/usePositions";
 import { PositionCard } from "./PositionCard";
-import { AddLiquidity } from "@/components/liquidity/AddLiquidity";
-import { useState } from "react";
-import { Plus, ArrowLeft } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useAccount } from "wagmi";
+import { useRouter } from "next/navigation";
 
 export function PositionList() {
   const { positions, isLoading } = usePositions();
-  const [showAddLiquidity, setShowAddLiquidity] = useState(false);
   const { isConnected } = useAccount();
-
-  if (showAddLiquidity) {
-    return (
-      <div>
-        <button
-          onClick={() => setShowAddLiquidity(false)}
-          className="flex gap-2 items-center px-4 py-2 mb-4 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Positions</span>
-        </button>
-        <AddLiquidity fromPositionsPage={true} />
-      </div>
-    );
-  }
+  const router = useRouter();
 
   return (
     <div className="space-y-6">
@@ -47,7 +31,7 @@ export function PositionList() {
           )}
         </div>
         <button
-          onClick={() => setShowAddLiquidity(true)}
+          onClick={() => router.push('/add-liquidity')}
           className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
         >
           <Plus className="w-4 h-4" />
