@@ -2,11 +2,10 @@
 
 import { usePoolDetails } from '@/hooks/usePoolDetails';
 import { formatCurrency, formatNumber, formatAddress } from '@/lib/utils';
-import { AddLiquidity } from '@/components/liquidity/AddLiquidity';
-import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { showToast } from '@/lib/showToast';
 import { Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface PoolDetailsProps {
   poolAddress: string;
@@ -14,8 +13,8 @@ interface PoolDetailsProps {
 
 export function PoolDetails({ poolAddress }: PoolDetailsProps) {
   const { pool, isLoading } = usePoolDetails(poolAddress);
-  const [showAddLiquidity, setShowAddLiquidity] = useState(false);
   const { isConnected } = useAccount();
+  const router = useRouter();
 
   const handleAddLiquidityClick = () => {
     if (!isConnected) {
@@ -24,8 +23,14 @@ export function PoolDetails({ poolAddress }: PoolDetailsProps) {
         title: 'Wallet Not Connected',
         description: 'Please connect your wallet first to add liquidity',
       });
-    } else {
-      setShowAddLiquidity(true);
+    } else if (pool) {
+      // Navigate to add-liquidity page with pool info as query parameters
+      const params = new URLSearchParams({
+        token0: pool.token0.address,
+        token1: pool.token1.address,
+        fee: pool.feeTier.toString(),
+      });
+      router.push(`/add-liquidity?${params.toString()}`);
     }
   };
 
@@ -35,25 +40,6 @@ export function PoolDetails({ poolAddress }: PoolDetailsProps) {
 
   if (!pool) {
     return <div className="text-center py-12 text-text-secondary">Pool not found</div>;
-  }
-
-  if (showAddLiquidity) {
-    return (
-      <div>
-        <button
-          onClick={() => setShowAddLiquidity(false)}
-          className="mb-4 text-primary hover:opacity-80 hover:underline"
-        >
-          ← Back to Pool
-        </button>
-        <AddLiquidity 
-          initialToken0={pool.token0}
-          initialToken1={pool.token1}
-          initialFee={pool.feeTier}
-          disableTokenSelection={true}
-        />
-      </div>
-    );
   }
 
   return (
