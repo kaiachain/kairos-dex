@@ -20,7 +20,6 @@ export function SwapInterface() {
   const [amountIn, setAmountIn] = useState('');
   const [slippage, setSlippage] = useState(0.5);
   const [deadline, setDeadline] = useState(20);
-  const [expertMode, setExpertMode] = useState(false);
 
   const { data: balanceIn, refetch: refetchBalanceIn } = useTokenBalance(tokenIn);
   const { data: balanceOut, refetch: refetchBalanceOut } = useTokenBalance(tokenOut);
@@ -176,10 +175,8 @@ export function SwapInterface() {
         <SwapSettings
           slippage={slippage}
           deadline={deadline}
-          expertMode={expertMode}
           onSlippageChange={setSlippage}
           onDeadlineChange={setDeadline}
-          onExpertModeChange={setExpertMode}
         />
       </div>
 

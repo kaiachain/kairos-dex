@@ -6,19 +6,15 @@ import { Settings } from 'lucide-react';
 interface SwapSettingsProps {
   slippage: number;
   deadline: number;
-  expertMode: boolean;
   onSlippageChange: (value: number) => void;
   onDeadlineChange: (value: number) => void;
-  onExpertModeChange: (value: boolean) => void;
 }
 
 export function SwapSettings({
   slippage,
   deadline,
-  expertMode,
   onSlippageChange,
   onDeadlineChange,
-  onExpertModeChange,
 }: SwapSettingsProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -95,27 +91,6 @@ export function SwapSettings({
                   <span className="text-sm text-text-secondary">minutes</span>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-text-primary">Expert Mode</label>
-                <button
-                  onClick={() => onExpertModeChange(!expertMode)}
-                  className={`relative w-12 h-6 rounded-full transition-all ${
-                    expertMode ? 'bg-primary' : 'bg-secondary'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      expertMode ? 'translate-x-6' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-              {expertMode && (
-                <p className="text-xs text-secondary">
-                  Expert mode bypasses confirmation screens and allows high slippage trades
-                </p>
-              )}
             </div>
           </div>
         </>
