@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Manrope, Red_Hat_Display } from 'next/font/google';
 import './globals.css';
+import 'react-toastify/dist/ReactToastify.css';
 import { Providers } from './providers';
 
 // Load Manrope font (primary font)

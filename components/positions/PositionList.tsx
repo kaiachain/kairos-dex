@@ -32,7 +32,8 @@ export function PositionList() {
         </div>
         <button
           onClick={() => router.push('/add-liquidity')}
-          className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
+          disabled={!isConnected}
+          className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-border"
         >
           <Plus className="w-4 h-4" />
           <span>Create Position</span>

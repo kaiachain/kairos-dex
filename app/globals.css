@@ -138,12 +138,178 @@ body.modal-open {
   animation: scale-in 0.2s ease-out;
 }
 
-/* Toast/Notification Styles */
-.toast-container {
-  background: #1f5214;
-  border: 1px solid rgba(64, 171, 43, 0.4);
-  border-radius: 16px;
-  box-shadow: 0px 8px 16px rgba(87, 207, 63, 0.251);
+/* Toast/Notification Styles - React Toastify Overrides */
+/* Aligned with codebase design: card backgrounds, subtle colors, consistent borders */
+.Toastify__toast-body {
+  align-items: flex-start !important;
+  padding: 0 !important;
+}
+
+.Toastify__toast {
+  border-radius: 1.5rem !important; /* rounded-3xl */
+  padding: 16px !important;
+  margin-bottom: 12px !important;
+  min-height: auto !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important; /* shadow-lg */
+  background: var(--card-bg) !important; /* Default background */
+  border: 1px solid var(--border-color) !important; /* Default border */
+  backdrop-filter: blur(12px) !important; /* Blur background */
+  -webkit-backdrop-filter: blur(12px) !important; /* Safari support */
+}
+
+/* Toast type colors - using subtle backgrounds with borders like other UI elements */
+/* Apply to both react-toastify classes and custom classes with high specificity */
+.Toastify__toast--info,
+.Toastify__toast--info.Toastify__toast,
+.toast-info,
+.toast-info.Toastify__toast,
+.Toastify__toast.toast-info,
+.Toastify__toast.Toastify__toast--info {
+  background: rgba(87, 207, 63, 0.2) !important; /* success color with 20% opacity - increased for visibility */
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(87, 207, 63, 0.5) !important; /* success color with opacity */
+}
+
+.Toastify__toast--info .Toastify__toast-icon,
+.toast-info .Toastify__toast-icon {
+  color: var(--success) !important;
+}
+
+.Toastify__toast--success,
+.Toastify__toast--success.Toastify__toast,
+.toast-success,
+.toast-success.Toastify__toast,
+.Toastify__toast.toast-success,
+.Toastify__toast.Toastify__toast--success {
+  background: rgba(87, 207, 63, 0.2) !important; /* success color with 20% opacity - increased for visibility */
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(87, 207, 63, 0.5) !important; /* success color with opacity */
+}
+
+.Toastify__toast--success .Toastify__toast-icon,
+.toast-success .Toastify__toast-icon {
+  color: var(--success) !important;
+}
+
+.Toastify__toast--warning,
+.Toastify__toast--warning.Toastify__toast,
+.toast-warning,
+.toast-warning.Toastify__toast,
+.Toastify__toast.toast-warning,
+.Toastify__toast.Toastify__toast--warning {
+  background: rgba(158, 158, 158, 0.2) !important; /* secondary color with 20% opacity - increased for visibility */
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(158, 158, 158, 0.5) !important; /* secondary color with opacity */
+}
+
+.Toastify__toast--warning .Toastify__toast-icon,
+.toast-warning .Toastify__toast-icon {
+  color: var(--secondary) !important;
+}
+
+.Toastify__toast--error,
+.Toastify__toast--error.Toastify__toast,
+.toast-error,
+.toast-error.Toastify__toast,
+.Toastify__toast.toast-error,
+.Toastify__toast.Toastify__toast--error {
+  background: rgba(235, 128, 122, 0.2) !important; /* error color with 20% opacity - increased for visibility */
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(235, 128, 122, 0.5) !important; /* error color with opacity */
+}
+
+.Toastify__toast--error .Toastify__toast-icon,
+.toast-error .Toastify__toast-icon {
+  color: var(--error) !important;
+}
+
+.dark .Toastify__toast--info,
+.dark .Toastify__toast--info.Toastify__toast,
+.dark .toast-info,
+.dark .toast-info.Toastify__toast,
+.dark .Toastify__toast.toast-info,
+.dark .Toastify__toast.Toastify__toast--info {
+  background: rgba(64, 171, 43, 0.2) !important; /* success color with 20% opacity - increased for visibility */
+  border: 1px solid rgba(64, 171, 43, 0.5) !important;
+}
+
+.dark .Toastify__toast--success,
+.dark .Toastify__toast--success.Toastify__toast,
+.dark .toast-success,
+.dark .toast-success.Toastify__toast,
+.dark .Toastify__toast.toast-success,
+.dark .Toastify__toast.Toastify__toast--success {
+  background: rgba(64, 171, 43, 0.2) !important; /* success color with 20% opacity - increased for visibility */
+  border: 1px solid rgba(64, 171, 43, 0.5) !important;
+}
+
+.dark .Toastify__toast--warning,
+.dark .Toastify__toast--warning.Toastify__toast,
+.dark .toast-warning,
+.dark .toast-warning.Toastify__toast,
+.dark .Toastify__toast.toast-warning,
+.dark .Toastify__toast.Toastify__toast--warning {
+  background: rgba(102, 112, 133, 0.2) !important; /* secondary color with 20% opacity - increased for visibility */
+  border: 1px solid rgba(102, 112, 133, 0.5) !important;
+}
+
+.dark .Toastify__toast--error,
+.dark .Toastify__toast--error.Toastify__toast,
+.dark .toast-error,
+.dark .toast-error.Toastify__toast,
+.dark .Toastify__toast.toast-error,
+.dark .Toastify__toast.Toastify__toast--error {
+  background: rgba(232, 91, 86, 0.2) !important; /* error color with 20% opacity - increased for visibility */
+  border: 1px solid rgba(232, 91, 86, 0.5) !important;
+}
+
+/* Toast sizes - handled via data attributes */
+.Toastify__toast[data-size="small"] {
+  width: 240px !important;
+}
+
+.Toastify__toast[data-size="medium"] {
+  width: 320px !important;
+}
+
+.Toastify__toast[data-size="large"] {
+  width: 480px !important;
+}
+
+/* Toast animations */
+@keyframes mobileToast {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes desktopToast {
+  from {
+    opacity: 0;
+    translate: 0 -8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .Toastify__toast {
+    animation: mobileToast 0.3s ease-in-out !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .Toastify__toast {
+    animation: desktopToast 0.3s ease-in-out !important;
+  }
 }
 
 /* Background gradient shapes */

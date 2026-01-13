@@ -3,11 +3,26 @@
 import { Layout } from '@/components/layout/Layout';
 import { PoolExplorer } from '@/components/pools/PoolExplorer';
 import { CreatePool } from '@/components/pools/CreatePool';
+import { showToast } from '@/lib/showToast';
 import { useState } from 'react';
 import { ArrowLeft, Plus } from 'lucide-react';
+import { useAccount } from 'wagmi';
 
 export default function PoolsPage() {
   const [showCreatePool, setShowCreatePool] = useState(false);
+  const { isConnected } = useAccount();
+
+  const handleCreatePoolClick = () => {
+    if (!isConnected) {
+      showToast({
+        type: 'info',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet first to create a pool',
+      });
+    } else {
+      setShowCreatePool(true);
+    }
+  };
 
   return (
     <Layout>
@@ -40,8 +55,12 @@ export default function PoolsPage() {
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold text-text-primary">Pools</h1>
             <button
-              onClick={() => setShowCreatePool(true)}
-              className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary transition-all font-medium"
+              onClick={handleCreatePoolClick}
+              className={`flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg transition-all font-medium ${
+                !isConnected
+                  ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:border-border'
+                  : 'hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary'
+              }`}
             >
               <Plus className="w-4 h-4" />
               <span>Create Pool</span>
