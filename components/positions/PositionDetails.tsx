@@ -164,7 +164,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
         {poolAddress && (
           <Link
             href={`/pools/${poolAddress}`}
-            className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary transition-all font-medium"
+            className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg hover:bg-gray-50 dark:hover:bg-input-bg hover:border-[color:var(--border-hover)] transition-all font-medium"
           >
             <span>View Pool</span>
             <ExternalLink className="w-4 h-4" />

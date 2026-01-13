@@ -58,7 +58,7 @@ export function PoolDetails({ poolAddress }: PoolDetailsProps) {
         </div>
         <button
           onClick={handleAddLiquidityClick}
-          className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg transition-all font-medium hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
+          className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg transition-all font-medium hover:bg-gray-50 dark:hover:bg-input-bg hover:border-[color:var(--border-hover)]"
         >
           <Plus className="w-4 h-4" />
           <span>Add Liquidity</span>

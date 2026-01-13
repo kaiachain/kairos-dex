@@ -18,7 +18,7 @@ function TokenBalanceCard({ token, balance, isLoading }: TokenBalanceCardProps) 
   const displayBalance = balance && parseFloat(balance) > 0 ? formatBalance(parseFloat(balance), 6) : "0";
   
   return (
-    <div className="bg-white dark:bg-card rounded-lg p-4 border border-border hover:border-primary/50 transition-colors">
+    <div className="bg-white dark:bg-card rounded-lg p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2.5 min-w-0 flex-1">
           <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-xs flex-shrink-0">

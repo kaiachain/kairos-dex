@@ -46,7 +46,7 @@ export function PositionList() {
         <button
           type="button"
           onClick={handleCreatePositionClick}
-          className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
+          className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-[color:var(--border-hover)]"
         >
           <Plus className="w-4 h-4" />
           <span>Create Position</span>

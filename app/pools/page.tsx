@@ -41,7 +41,7 @@ export default function PoolsPage() {
               <h1 className="text-3xl font-bold text-text-primary">Create Pool</h1>
               <button
                 onClick={() => setShowCreatePool(false)}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary transition-all font-medium"
+                className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg hover:bg-gray-50 dark:hover:bg-input-bg hover:border-[color:var(--border-hover)] transition-all font-medium"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Browse Pools</span>
@@ -56,7 +56,7 @@ export default function PoolsPage() {
             <h1 className="text-3xl font-bold text-text-primary">Pools</h1>
             <button
               onClick={handleCreatePoolClick}
-              className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg transition-all font-medium hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
+              className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg transition-all font-medium hover:bg-gray-50 dark:hover:bg-input-bg hover:border-[color:var(--border-hover)]"
             >
               <Plus className="w-4 h-4" />
               <span>Create Pool</span>

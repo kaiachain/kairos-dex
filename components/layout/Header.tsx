@@ -87,7 +87,7 @@ function ConnectWalletModal({
                   connect({ connector });
                   onClose();
                 }}
-                className="w-full flex items-center space-x-4 px-4 py-4 bg-gray-50 dark:bg-input-bg hover:bg-gray-100 dark:hover:bg-bg rounded-xl transition-all duration-200 border border-border hover:border-primary group"
+                className="w-full flex items-center space-x-4 px-4 py-4 bg-gray-50 dark:bg-input-bg hover:bg-gray-100 dark:hover:bg-bg rounded-xl transition-all duration-200 border border-border hover:border-[color:var(--border-hover)] group"
               >
                 <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-bg flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                   {getConnectorIcon(connector)}

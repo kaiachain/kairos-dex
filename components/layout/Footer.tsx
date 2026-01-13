@@ -27,7 +27,7 @@ function ContractLink({ address, label, icon, explorerUrl }: ContractLinkProps) 
   };
 
   return (
-    <div className="group flex items-center gap-2 px-3 py-2 bg-white dark:bg-card rounded-lg border border-border hover:border-primary/50 hover:shadow-md transition-all duration-200">
+    <div className="group flex items-center gap-2 px-3 py-2 bg-white dark:bg-card rounded-lg border border-border hover:border-[color:var(--border-hover)] hover:shadow-md transition-all duration-200">
       <div className="w-5 h-5 text-primary flex-shrink-0">
         {icon}
       </div>

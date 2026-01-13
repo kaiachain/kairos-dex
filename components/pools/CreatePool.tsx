@@ -250,7 +250,7 @@ export function CreatePool() {
     <div className="bg-white dark:bg-card rounded-3xl shadow-lg p-6 border border-border">
       <div className="space-y-3">
         {/* Token 0 Input */}
-        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Token 0</label>
           </div>
@@ -269,7 +269,7 @@ export function CreatePool() {
         </div>
 
         {/* Token 1 Input */}
-        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Token 1</label>
           </div>
@@ -298,7 +298,7 @@ export function CreatePool() {
                 className={`p-2.5 rounded-lg border transition-all ${
                   fee === tier.value
                     ? "bg-primary text-bg border-primary shadow-sm"
-                    : "bg-white dark:bg-card border-border hover:border-primary/50"
+                    : "bg-white dark:bg-card border-border hover:border-[color:var(--border-hover)]"
                 }`}
               >
                 <div className={`font-semibold text-xs leading-tight ${
@@ -317,7 +317,7 @@ export function CreatePool() {
         </div>
 
         {/* Initial Price Input */}
-        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
               Initial Price

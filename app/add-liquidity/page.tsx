@@ -70,7 +70,7 @@ export default function AddLiquidityPage() {
         <div className="relative z-10 w-full max-w-[420px] space-y-8">
           <button
             onClick={() => router.back()}
-            className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-primary"
+            className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-[color:var(--border-hover)]"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>

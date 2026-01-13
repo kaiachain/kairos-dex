@@ -63,7 +63,7 @@ export function TokenSelector({
         className={`flex items-center space-x-2 px-4 py-2.5 bg-gray-50 dark:bg-input-bg rounded-xl border border-border transition-all min-w-[120px] font-medium ${
           disabled 
             ? 'opacity-50 cursor-not-allowed' 
-            : 'hover:bg-gray-100 dark:hover:bg-bg hover:border-primary cursor-pointer shadow-sm hover:shadow-md'
+            : 'hover:bg-gray-100 dark:hover:bg-bg hover:border-[color:var(--border-hover)] cursor-pointer shadow-sm hover:shadow-md'
         }`}
       >
         {selectedToken ? (

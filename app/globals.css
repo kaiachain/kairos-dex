@@ -16,6 +16,7 @@
   --input-text: #040404;
   --card-bg: #ffffff;
   --border-color: rgba(0, 0, 0, 0.1);
+  --border-hover: rgba(172, 216, 8, 0.35);
 }
 
 .dark {
@@ -31,6 +32,7 @@
   --input-text: #ffffff;
   --card-bg: #1a1a1a;
   --border-color: rgba(255, 255, 255, 0.1);
+  --border-hover: rgba(191, 240, 9, 0.4);
 }
 
 * {

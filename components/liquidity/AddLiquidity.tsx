@@ -827,7 +827,7 @@ export function AddLiquidity({
                     <button
                       key={pool.address}
                       onClick={() => setSelectedPool(pool)}
-                      className="w-full text-left p-4 bg-gray-50 dark:bg-input-bg hover:bg-gray-100 dark:hover:bg-bg rounded-lg transition-colors border border-transparent hover:border-primary"
+                      className="w-full text-left p-4 bg-gray-50 dark:bg-input-bg hover:bg-gray-100 dark:hover:bg-bg rounded-lg transition-colors border border-transparent hover:border-[color:var(--border-hover)]"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">

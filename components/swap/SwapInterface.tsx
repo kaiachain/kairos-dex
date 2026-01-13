@@ -185,7 +185,7 @@ export function SwapInterface() {
 
       <div className="space-y-3">
         {/* Token In Input */}
-        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">You pay</label>
             {balanceIn && isConnected && (
@@ -221,7 +221,7 @@ export function SwapInterface() {
         <div className="flex justify-center -my-1 relative z-10">
           <button
             onClick={handleReverse}
-            className="p-2.5 bg-white dark:bg-card border-2 border-border rounded-full hover:bg-gray-50 dark:hover:bg-bg transition-all shadow-md hover:shadow-lg hover:border-primary"
+            className="p-2.5 bg-white dark:bg-card border-2 border-border rounded-full hover:bg-gray-50 dark:hover:bg-bg transition-all shadow-md hover:shadow-lg hover:border-[color:var(--border-hover)]"
             aria-label="Reverse tokens"
           >
             <ArrowDownUp className="w-5 h-5 text-text-secondary" />
@@ -229,7 +229,7 @@ export function SwapInterface() {
         </div>
 
         {/* Token Out Input */}
-        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-primary transition-colors">
+        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">You receive</label>
             {isQuoteLoading ? (
