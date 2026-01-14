@@ -7,10 +7,12 @@ import { SwapButton } from './SwapButton';
 import { SwapSettings } from './SwapSettings';
 import { PriceInfo } from './PriceInfo';
 import { SwapConfirmation } from './SwapConfirmation';
+import { TerminalStatus } from './TerminalStatus';
 import { ArrowDownUp, Loader2 } from 'lucide-react';
 import { Token } from '@/types/token';
 import { useSwapQuote } from '@/hooks/useSwapQuote';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
+import { useSwapStatus } from '@/hooks/useSwapStatus';
 import { formatBalance } from '@/lib/utils';
 
 export function SwapInterface() {
@@ -23,11 +25,12 @@ export function SwapInterface() {
 
   const { data: balanceIn, refetch: refetchBalanceIn } = useTokenBalance(tokenIn);
   const { data: balanceOut, refetch: refetchBalanceOut } = useTokenBalance(tokenOut);
-  const { data: quote, isLoading: isQuoteLoading, error: quoteError } = useSwapQuote(
+  const { data: quote, isLoading: isQuoteLoading, error: quoteError, getCachedRoute } = useSwapQuote(
     tokenIn,
     tokenOut,
     amountIn
   );
+  const { messages: statusMessages, clearMessages } = useSwapStatus();
 
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [swapHash, setSwapHash] = useState<string | null>(null);
@@ -89,6 +92,9 @@ export function SwapInterface() {
     setShowConfirmation(true);
     console.log('Setting showConfirmation to true');
     
+    // Clear terminal messages when swap is confirmed
+    clearMessages();
+    
     // Clear form after showing confirmation
     setAmountIn('');
     refetchBalanceIn?.();
@@ -99,7 +105,7 @@ export function SwapInterface() {
       isProcessingSwapSuccessRef.current = false;
       console.log('Swap success processing complete');
     }, 1000);
-  }, [refetchBalanceIn, refetchBalanceOut, tokenIn, tokenOut, amountIn, quote]);
+  }, [refetchBalanceIn, refetchBalanceOut, tokenIn, tokenOut, amountIn, quote, clearMessages]);
 
   // Reset confirmation on page load/reload
   // Note: React state automatically resets on page reload, but we ensure refs are cleared too
@@ -146,7 +152,9 @@ export function SwapInterface() {
     // Only consider amountIn changed if it's not empty (user typing, not clearing after swap)
     const amountInChanged = prevAmountInRef.current !== amountIn && amountIn !== '';
 
+    // Clear terminal when tokens or amount change
     if (tokenInChanged || tokenOutChanged || amountInChanged) {
+      clearMessages();
       // Reset confirmation when form changes
       setShowConfirmation(false);
       setSwapHash(null);
@@ -158,7 +166,7 @@ export function SwapInterface() {
     prevTokenInRef.current = tokenIn;
     prevTokenOutRef.current = tokenOut;
     prevAmountInRef.current = amountIn;
-  }, [tokenIn, tokenOut, amountIn, showConfirmation]);
+  }, [tokenIn, tokenOut, amountIn, showConfirmation, clearMessages]);
 
   const handleAmountChange = useCallback((value: string) => {
     // Only allow valid number input
@@ -289,8 +297,19 @@ export function SwapInterface() {
           deadline={deadline}
           quote={quote}
           isQuoteLoading={isQuoteLoading}
+          cachedRoute={getCachedRoute?.()}
           onSwapSuccess={handleSwapSuccess}
         />
+
+        {/* Terminal Status - Developer View */}
+        {(isQuoteLoading || statusMessages.length > 0) && (
+          <div className="mt-4">
+            <TerminalStatus 
+              messages={statusMessages} 
+              isActive={isQuoteLoading || statusMessages.length > 0}
+            />
+          </div>
+        )}
       </div>
 
       {/* Swap Confirmation Modal */}

@@ -144,7 +144,7 @@ export function RouteDisplay({ route, tokenIn, tokenOut }: RouteDisplayProps) {
           </div>
         ) : (
           routeTokens.map((token, index) => (
-            <div key={token.address} className="flex items-center gap-2">
+            <div key={`${token.address}-${index}`} className="flex items-center gap-2">
               <span
                 className={`text-sm font-medium px-2 py-1 rounded ${
                   index === 0

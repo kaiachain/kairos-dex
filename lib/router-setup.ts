@@ -42,12 +42,18 @@ export function setupRouterPatches(
     chainsUtil.ID_TO_CHAIN_ID = (id: number) => id === 1001 ? ChainId.MAINNET : originalIDToChainId(id);
     chainsUtil.ID_TO_NETWORK_NAME = (id: number) => id === 1001 ? 'mainnet' : originalIDToNetworkName(id);
     
-    // Patch routing config
+    // Patch routing config - optimize for speed
     const originalDefaultRoutingConfig = configUtil.DEFAULT_ROUTING_CONFIG_BY_CHAIN;
     configUtil.DEFAULT_ROUTING_CONFIG_BY_CHAIN = (chainId: number) => {
       const config = originalDefaultRoutingConfig(chainId === 1001 ? ChainId.MAINNET : chainId);
-      if (config?.distributionPercent !== undefined) {
-        return { ...config, distributionPercent: +config.distributionPercent || 5 };
+      if (config) {
+        return { 
+          ...config, 
+          distributionPercent: +config.distributionPercent || 5,
+          // Optimize for speed: limit max hops and reduce search space
+          maxSwapsPerPath: 2, // Limit to 2 hops max for faster routing
+          maxSplits: 1, // Reduce splits for speed
+        };
       }
       return config;
     };

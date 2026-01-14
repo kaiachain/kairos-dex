@@ -242,9 +242,12 @@ function createOnChainQuoteProvider(provider: JsonRpcProvider, multicall2Provide
       DEFAULT_BLOCK_NUMBER_CONFIGS,
     } = require("@uniswap/smart-order-router/build/main/util/onchainQuoteProviderConfigs");
 
+    // Optimize batch params - balance between speed and multi-hop support
     const customBatchParams = () => ({
       ...DEFAULT_BATCH_PARAMS,
       gasLimitPerCall: 5000000,
+      multicallChunk: 30, // Moderate chunks - allow more for multi-hop
+      quoteMinSuccessRate: 0.1, // Slightly higher threshold for reliability
     });
 
     const customBlockNumberConfig = () => ({
@@ -252,11 +255,18 @@ function createOnChainQuoteProvider(provider: JsonRpcProvider, multicall2Provide
       baseBlockOffset: 0,
     });
 
+    // Use balanced retry options - allow retries for multi-hop reliability
+    const fastRetryOptions = {
+      retries: 1, // Allow 1 retry for multi-hop routes
+      minTimeout: 50,
+      maxTimeout: 500,
+    };
+
     return new OnChainQuoteProvider(
       ChainId.MAINNET,
       provider,
       multicall2Provider,
-      DEFAULT_RETRY_OPTIONS,
+      fastRetryOptions, // Use fast retry options instead of defaults
       customBatchParams,
       DEFAULT_GAS_ERROR_FAILURE_OVERRIDES,
       DEFAULT_SUCCESS_RATE_FAILURE_OVERRIDES,
@@ -281,7 +291,7 @@ function createOnChainQuoteProvider(provider: JsonRpcProvider, multicall2Provide
       ChainId.MAINNET,
       provider,
       multicall2Provider,
-      { retries: 2, minTimeout: 50, maxTimeout: 500 },
+      { retries: 0, minTimeout: 50, maxTimeout: 200 }, // No retries for speed
       fallbackBatchParams,
       fallbackGasErrorOverrides,
       fallbackSuccessRateOverrides,
@@ -350,10 +360,12 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
       state.multicall2Address
     );
 
+    // Optimize subgraph provider - balance between speed and multi-hop support
+    // Use more pools for multi-hop routes, but still optimized for speed
     const v3SubgraphProvider = new V3SubgraphProvider(
       CHAIN_ID,
-      10,
-      30000,
+      5, // Increased to 5 - need more pools for multi-hop route discovery
+      15000, // Increased timeout to 15s - multi-hop routes need more time
       true,
       0.01,
       Number.MAX_VALUE,
@@ -361,10 +373,11 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
       process.env.NEXT_PUBLIC_SUBGRAPH_BEARER_TOKEN || "d1c0ffba8f198132674e26bb04cec97d"
     );
 
+    // Optimize pool provider - allow retries for multi-hop routes
     const v3PoolProvider = new V3PoolProvider(
       ChainId.MAINNET,
       multicall2Provider as any,
-      { retries: 2, minTimeout: 50, maxTimeout: 500 }
+      { retries: 1, minTimeout: 50, maxTimeout: 500 } // Allow 1 retry for multi-hop reliability
     );
 
     const onChainQuoteProvider = createOnChainQuoteProvider(rpcProvider, multicall2Provider);

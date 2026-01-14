@@ -14,6 +14,7 @@ interface SwapButtonProps {
   deadline: number;
   quote: SwapQuote | null;
   isQuoteLoading: boolean;
+  cachedRoute?: any; // Optional cached route for faster execution
   onSwapSuccess?: (hash: string) => void;
 }
 
@@ -26,6 +27,7 @@ export function SwapButton({
   deadline,
   quote,
   isQuoteLoading,
+  cachedRoute,
   onSwapSuccess,
 }: SwapButtonProps) {
   const {
@@ -49,6 +51,7 @@ export function SwapButton({
     slippage,
     deadline,
     quote,
+    cachedRoute,
     onSwapSuccess: onSwapSuccess ? ((hash: string) => onSwapSuccess(hash)) : undefined,
   });
 

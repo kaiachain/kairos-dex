@@ -14,6 +14,7 @@ import { maxUint256 } from 'viem';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { RPC_URL } from '@/config/env';
 import { getRouterRoute } from '@/hooks/useSwapQuote';
+import { addStatusMessage } from '@/hooks/useSwapStatus';
 
 export interface SwapExecutionState {
   needsApproval: boolean;
@@ -32,6 +33,7 @@ export interface UseSwapExecutionOptions {
   slippage: number;
   deadline: number;
   quote: SwapQuote | null;
+  cachedRoute?: any; // Optional cached route from quote hook
   onSwapSuccess?: (hash: string) => void;
 }
 
@@ -57,6 +59,7 @@ export function useSwapExecution({
   slippage,
   deadline,
   quote,
+  cachedRoute,
   onSwapSuccess,
 }: UseSwapExecutionOptions) {
   const { address, isConnected } = useAccount();
@@ -69,6 +72,7 @@ export function useSwapExecution({
   const [isPreparingSwap, setIsPreparingSwap] = useState(false);
   
   const lastProcessedApprovalHash = useRef<string | undefined>(undefined);
+  const lastProcessedSwapHash = useRef<string | undefined>(undefined);
   const latestRefetchedAllowance = useRef<bigint | undefined>(undefined);
   const refetchedAllowanceToken = useRef<string | undefined>(undefined);
 
@@ -203,7 +207,9 @@ export function useSwapExecution({
 
   // Call onSwapSuccess callback when swap transaction is confirmed
   useEffect(() => {
-    if (isSwapConfirmed && onSwapSuccess && swapHash) {
+    if (isSwapConfirmed && onSwapSuccess && swapHash && swapHash !== lastProcessedSwapHash.current) {
+      lastProcessedSwapHash.current = swapHash;
+      addStatusMessage('success', `Swap transaction confirmed!`, `Hash: ${swapHash}`);
       onSwapSuccess(swapHash);
     }
   }, [isSwapConfirmed, onSwapSuccess, swapHash]);
@@ -352,7 +358,10 @@ export function useSwapExecution({
     try {
       const provider = new JsonRpcProvider(RPC_URL);
 
+      addStatusMessage('info', 'Preparing swap execution...', `Slippage: ${slippage}%, Deadline: ${deadline}min`);
       console.log('Getting route from Smart Order Router...');
+      // Always use Smart Order Router for execution - it handles all cases properly
+      // including multi-hop routes, slippage, gas estimation, and multicall encoding
       const routeResult = await getRouterRoute(
         tokenIn,
         tokenOut,
@@ -360,10 +369,12 @@ export function useSwapExecution({
         slippage,
         deadline,
         address,
-        provider
+        provider,
+        cachedRoute // Pass cached route - router may optimize if possible
       );
 
       if (!routeResult || !routeResult.methodParameters) {
+        addStatusMessage('error', 'No route found', 'Please try again or check token pair');
         setError(new Error('No route found. Please try again.'));
         setStatus('error');
         setIsPreparingSwap(false);
@@ -371,9 +382,11 @@ export function useSwapExecution({
       }
 
       console.log(`Route found: ${routeResult.quote.toExact()} ${tokenOut.symbol}`);
+      addStatusMessage('success', `Route ready: ${routeResult.quote.toExact()} ${tokenOut.symbol}`, 'MethodParameters generated');
 
       setIsPreparingSwap(false);
       setStatus('swapping');
+      addStatusMessage('loading', 'Sending swap transaction...', 'Waiting for wallet confirmation');
       console.log('Sending swap transaction...');
       sendSwapTransaction({
         to: CONTRACTS.SwapRouter02 as `0x${string}`,
@@ -381,6 +394,7 @@ export function useSwapExecution({
         value: routeResult.methodParameters.value ? BigInt(routeResult.methodParameters.value) : undefined,
       });
 
+      addStatusMessage('info', 'Transaction sent to wallet', 'Please confirm in your wallet');
       console.log('Swap transaction sent successfully');
     } catch (error) {
       console.error('Swap error:', error);
