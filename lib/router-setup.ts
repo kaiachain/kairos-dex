@@ -50,8 +50,8 @@ export function setupRouterPatches(
         return { 
           ...config, 
           distributionPercent: +config.distributionPercent || 5,
-          // Optimize for speed: limit max hops and reduce search space
-          maxSwapsPerPath: 2, // Limit to 2 hops max for faster routing
+          // Allow up to 4 hops for multi-hop routes (e.g., USDT -> WKAIA -> MTK -> YTK)
+          maxSwapsPerPath: 4, // Increased to 4 hops to support complex multi-hop routes
           maxSplits: 1, // Reduce splits for speed
         };
       }

@@ -253,8 +253,34 @@ async function getQuoteFromRouter(
       route = await Promise.race([routePromise, timeoutPromise]);
       const duration = Date.now() - startTime;
       perfMarkers['route_end'] = Date.now();
+      
+      // Check if route is null - router might return null instead of throwing
+      if (!route || route === null) {
+        console.error(`❌ Router returned null (no route found) after ${duration}ms`);
+        console.error('This usually means no valid route exists between the tokens');
+        addStatusMessage('error', `No route found after ${(duration / 1000).toFixed(2)}s`, 'No valid path exists between these tokens. Check if pools exist.');
+        return null;
+      }
+      
       console.log(`✅ Route found in ${duration}ms (total)`);
+      console.log('========================================');
+      console.log('🔍 DEBUG: About to check route structure...');
+      console.log('Route object:', route);
+      console.log('Route type:', typeof route);
+      console.log('Route keys:', route ? Object.keys(route) : 'null');
+      console.log('========================================');
       addStatusMessage('success', `Route found in ${(duration / 1000).toFixed(2)}s`, `Analyzing route structure...`);
+      
+      // Log route object structure immediately after finding it
+      console.log('🔍 Route object structure check:', {
+        hasRoute: !!route,
+        routeKeys: route ? Object.keys(route) : [],
+        hasMethodParameters: route?.methodParameters ? true : false,
+        hasQuote: route?.quote ? true : false,
+        quoteType: route?.quote ? typeof route.quote : 'N/A',
+        hasQuoteToExact: route?.quote?.toExact ? true : false,
+        estimatedGasUsed: route?.estimatedGasUsed?.toString() || 'N/A',
+      });
       
       // Log performance breakdown if available
       if (route && route.estimatedGasUsed) {
@@ -276,14 +302,136 @@ async function getQuoteFromRouter(
       }
     }
 
-    if (!route || !route.methodParameters) {
-      console.warn(`No route found for ${tokenIn.symbol} -> ${tokenOut.symbol}`);
-      return null;
+    // Wrap everything in try-catch to catch any errors during quote extraction
+    try {
+      // Log route validation check
+      console.log('🔍 Validating route object:', {
+        hasRoute: !!route,
+        routeType: typeof route,
+        routeIsNull: route === null,
+        routeIsUndefined: route === undefined,
+        hasMethodParameters: route?.methodParameters ? true : false,
+        methodParametersType: route?.methodParameters ? typeof route.methodParameters : 'N/A',
+        routeKeys: route ? Object.keys(route).slice(0, 20) : [], // First 20 keys
+      });
+
+      if (!route || !route.methodParameters) {
+      console.warn(`⚠️ Route validation failed for ${tokenIn.symbol} -> ${tokenOut.symbol}`, {
+        hasRoute: !!route,
+        hasMethodParameters: route?.methodParameters ? true : false,
+        routeStructure: route ? JSON.stringify(route, (key, value) => {
+          // Avoid circular references and large objects
+          if (key === 'pools' || key === 'route' || (typeof value === 'object' && value !== null && Object.keys(value).length > 5)) {
+            return '[Object]';
+          }
+          return value;
+        }, 2).substring(0, 500) : 'null',
+      });
+      // For multi-hop routes, methodParameters might not be required for quote extraction
+      // Let's continue if we have a quote even without methodParameters
+      if (!route?.quote && !route?.trade?.quote) {
+        console.error('❌ No quote found and no methodParameters - cannot proceed');
+        return null;
+      } else {
+        console.log('⚠️ No methodParameters but quote exists - continuing for quote extraction only');
+      }
     }
 
-    // Extract quote information
-    const quote = route.quote;
-    const amountOut = quote.toExact();
+    // Extract quote information - try multiple possible locations
+    let quote = route.quote;
+    
+    // Some router versions might have quote in route.trade
+    if (!quote && route.trade) {
+      console.log('🔍 Quote not in route.quote, checking route.trade...');
+      quote = route.trade.quote || route.trade.outputAmount;
+      if (quote) {
+        console.log('✅ Found quote in route.trade');
+      }
+    }
+    
+    // Some router versions might have quote in route.trade.routes[0]
+    if (!quote && route.trade?.routes?.[0]) {
+      console.log('🔍 Checking route.trade.routes[0]...');
+      quote = route.trade.routes[0].quote || route.trade.routes[0].outputAmount;
+      if (quote) {
+        console.log('✅ Found quote in route.trade.routes[0]');
+      }
+    }
+    
+    if (!quote) {
+      console.error('❌ Route found but no quote property found in any expected location:', {
+        routeKeys: Object.keys(route),
+        hasTrade: !!route.trade,
+        tradeKeys: route.trade ? Object.keys(route.trade) : [],
+        hasRoutes: !!route.trade?.routes,
+        routeStructure: JSON.stringify(route, (key, value) => {
+          // Avoid circular references and large objects
+          if (key === 'pools' || key === 'route' || (typeof value === 'object' && value !== null && Object.keys(value).length > 10)) {
+            return '[Object]';
+          }
+          return value;
+        }, 2).substring(0, 1000),
+      });
+      throw new Error('Route found but quote property is missing from all expected locations');
+    }
+    let amountOut: string;
+    
+    try {
+      // Try multiple methods to extract the amount
+      if (typeof quote.toExact === 'function') {
+        amountOut = quote.toExact();
+        console.log('✅ Quote extracted using toExact():', amountOut);
+      } else if (typeof quote.toFixed === 'function') {
+        // Fallback to toFixed if toExact doesn't exist
+        amountOut = quote.toFixed(tokenOut.decimals || 18);
+        console.log('✅ Quote extracted using toFixed():', amountOut);
+      } else if (quote.quotient !== undefined) {
+        // CurrencyAmount object - extract from quotient
+        const { formatUnits } = require('@/lib/utils');
+        const quotient = typeof quote.quotient === 'bigint' 
+          ? quote.quotient 
+          : BigInt(quote.quotient.toString());
+        amountOut = formatUnits(quotient, tokenOut.decimals || 18);
+        console.log('✅ Quote extracted from quotient:', amountOut);
+      } else if (typeof quote.toString === 'function') {
+        // Last resort - try toString
+        const quoteStr = quote.toString();
+        // Try to parse it
+        const match = quoteStr.match(/[\d.]+/);
+        if (match) {
+          amountOut = match[0];
+          console.log('✅ Quote extracted from toString():', amountOut);
+        } else {
+          throw new Error('Could not parse quote from toString()');
+        }
+      } else {
+        console.error('❌ Quote object does not have any known extraction method:', {
+          quoteType: typeof quote,
+          quoteKeys: quote ? Object.keys(quote) : [],
+          quoteValue: quote,
+          quoteConstructor: quote?.constructor?.name,
+        });
+        throw new Error('Quote object does not have toExact, toFixed, quotient, or toString method');
+      }
+      
+      console.log('✅ Quote extracted successfully:', {
+        amountOut,
+        quoteType: typeof quote,
+        quoteValue: quote?.toFixed ? quote.toFixed(6) : 'N/A',
+        quoteString: quote?.toString ? quote.toString() : 'N/A',
+      });
+      
+      // Validate amountOut
+      if (!amountOut || amountOut === '0' || amountOut === 'NaN' || isNaN(parseFloat(amountOut))) {
+        console.error('❌ Invalid amountOut from quote:', amountOut);
+        throw new Error(`Invalid quote amount: ${amountOut}`);
+      }
+    } catch (quoteError: any) {
+      console.error('❌ Error extracting quote:', quoteError);
+      console.error('Quote object:', quote);
+      console.error('Quote object keys:', quote ? Object.keys(quote) : []);
+      throw new Error(`Failed to extract quote: ${quoteError?.message || String(quoteError)}`);
+    }
 
     // Debug: Log the route structure - log the full route object for inspection
     console.log('Full route object:', route);
@@ -550,14 +698,21 @@ async function getQuoteFromRouter(
       routeStructure: route.route ? 'route.route' : route.trade ? 'route.trade' : 'unknown'
     });
 
-    return {
-      amountOut,
-      fee,
-      gasEstimate,
-      poolAddress,
-      route: route.route,
-      routePath, // Add extracted path
-    };
+      return {
+        amountOut,
+        fee,
+        gasEstimate,
+        poolAddress,
+        route: route.route,
+        routePath, // Add extracted path
+      };
+    } catch (quoteExtractionError: any) {
+      console.error("❌ Error during quote extraction:", quoteExtractionError);
+      console.error("Error message:", quoteExtractionError?.message || String(quoteExtractionError));
+      console.error("Error stack:", quoteExtractionError?.stack);
+      // Re-throw to be caught by outer catch
+      throw quoteExtractionError;
+    }
   } catch (error) {
     console.error("Error getting quote from router:", error);
     // Log more details about the error for debugging
@@ -753,6 +908,24 @@ export function useSwapQuote(
           return;
         }
 
+        // Validate quoteResult before processing
+        if (!quoteResult.amountOut || quoteResult.amountOut === '0' || isNaN(parseFloat(quoteResult.amountOut))) {
+          console.error('❌ Invalid quoteResult.amountOut:', quoteResult.amountOut);
+          setQuote(null);
+          setStaleQuote(null);
+          setIsLoading(false);
+          setError(new Error('Invalid quote amount received from router'));
+          return;
+        }
+
+        console.log('✅ Quote result received:', {
+          amountOut: quoteResult.amountOut,
+          fee: quoteResult.fee,
+          gasEstimate: quoteResult.gasEstimate,
+          routePath: quoteResult.routePath,
+          poolAddress: quoteResult.poolAddress,
+        });
+
         // Calculate price as amountOut / amountIn for display
         const price = parseFloat(quoteResult.amountOut) / parseFloat(debouncedAmountIn);
 
@@ -775,6 +948,13 @@ export function useSwapQuote(
           poolAddress: quoteResult.poolAddress,
         };
 
+        console.log('✅ Created new quote object:', {
+          amountOut: newQuote.amountOut,
+          price: newQuote.price,
+          route: newQuote.route,
+          routeLength: newQuote.route?.length || 0,
+        });
+
         // Cache the quote - store the route for execution
         // The router's methodParameters will be fetched fresh during execution with correct recipient/slippage
         quoteCache.set(cacheKey, {
@@ -790,10 +970,19 @@ export function useSwapQuote(
           quoteCache.delete(oldestKey);
         }
 
-        if (cancelled || abortController?.signal.aborted) return;
+        if (cancelled || abortController?.signal.aborted) {
+          console.log('⚠️ Quote fetch cancelled or aborted');
+          return;
+        }
 
+        console.log('✅ Setting quote in state:', {
+          amountOut: newQuote.amountOut,
+          price: newQuote.price,
+          route: newQuote.route,
+        });
         setQuote(newQuote);
         setStaleQuote(null);
+        console.log('✅ Quote set in state successfully');
       } catch (err) {
         if (cancelled || abortController?.signal.aborted) return;
         console.error("Error fetching swap quote:", err);
