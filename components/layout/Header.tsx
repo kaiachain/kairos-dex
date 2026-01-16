@@ -54,6 +54,15 @@ function ConnectWalletModal({
     if (connectorId.includes("kaia") || connectorId.includes("kaikas") || connectorId.includes("klaytn")) {
       return "Kaia Wallet";
     }
+    if (connectorId.includes("keplr")) {
+      return "Keplr";
+    }
+    if (connectorId.includes("okx") || connectorId.includes("okex")) {
+      return "OKX Wallet";
+    }
+    if (connectorId.includes("enkrypt")) {
+      return null; // Filter out Enkrypt
+    }
     
     if (!connector.name) return "Unknown Wallet";
     const name = connector.name.toLowerCase();
@@ -61,31 +70,64 @@ function ConnectWalletModal({
     if (name.includes("walletconnect")) return "WalletConnect";
     if (name.includes("coinbase")) return "Coinbase Wallet";
     if (name.includes("kaia") || name.includes("kaikas") || name.includes("klaytn")) return "Kaia Wallet";
+    if (name.includes("keplr")) return "Keplr";
+    if (name.includes("okx") || name.includes("okex")) return "OKX Wallet";
+    if (name.includes("enkrypt")) return null; // Filter out Enkrypt
     return connector.name;
   };
 
   const getConnectorIcon = (connector: any) => {
-    // Check connector id first (more reliable)
-    const connectorId = connector.id?.toLowerCase() || "";
-    if (connectorId.includes("kaia") || connectorId.includes("kaikas") || connectorId.includes("klaytn")) {
-      return "🟣";
+    // Check if connector has an icon property first
+    if (connector.iconUrl || connector.icon) {
+      return connector.iconUrl || connector.icon;
     }
     
-    if (!connector.name) return "💼";
-    const name = connector.name.toLowerCase();
-    if (name.includes("metamask")) return "🦊";
-    if (name.includes("walletconnect")) return "🔗";
-    if (name.includes("coinbase")) return "🔵";
-    if (name.includes("kaia") || name.includes("kaikas") || name.includes("klaytn")) return "🟣";
-    return "💼";
+    // Check connector id first (more reliable)
+    const connectorId = connector.id?.toLowerCase() || "";
+    const connectorName = connector.name?.toLowerCase() || "";
+    
+    // Wallet icon URLs - using reliable CDN sources with jsDelivr proxy for GitHub
+    const walletIcons: Record<string, string> = {
+      metamask: "https://cdn.jsdelivr.net/gh/MetaMask/brand-resources@master/SVG/metamask-fox.svg",
+      walletconnect: "https://avatars.githubusercontent.com/u/37784886?s=200&v=4",
+      coinbase: "https://wallet-assets.coinbase.com/wallet-avatar.png",
+      kaia: "https://www.kaiawallet.io/favicon.ico",
+      kaikas: "https://www.kaiawallet.io/favicon.ico",
+      klaytn: "https://www.kaiawallet.io/favicon.ico",
+      keplr: "https://cdn.jsdelivr.net/gh/chainapsis/keplr-wallet@master/packages/extension/src/public/assets/icon-256.png",
+      okx: "https://www.okx.com/favicon.ico",
+      okex: "https://www.okx.com/favicon.ico",
+    };
+    
+    // Check by ID first
+    for (const [key, url] of Object.entries(walletIcons)) {
+      if (connectorId.includes(key)) {
+        return url;
+      }
+    }
+    
+    // Check by name
+    for (const [key, url] of Object.entries(walletIcons)) {
+      if (connectorName.includes(key)) {
+        return url;
+      }
+    }
+    
+    return null; // Return null for unknown wallets
   };
 
-  // Filter out connectors without names (except Kaia Wallet which we identify by id) and duplicates based on normalized name
+  // Filter out connectors without names, Enkrypt, and duplicates based on normalized name
   const uniqueConnectors = connectors
     .filter((connector) => {
+      // Filter out Enkrypt
+      const connectorId = connector.id?.toLowerCase() || "";
+      const connectorName = connector.name?.toLowerCase() || "";
+      if (connectorId.includes("enkrypt") || connectorName.includes("enkrypt")) {
+        return false;
+      }
+      
       // Include connectors with a name, or connectors that might be Kaia Wallet (identified by id)
       if (connector.name) return true;
-      const connectorId = connector.id?.toLowerCase() || "";
       if (connectorId.includes("kaia") || connectorId.includes("kaikas") || connectorId.includes("klaytn")) {
         return true;
       }
@@ -93,6 +135,8 @@ function ConnectWalletModal({
     })
     .filter((connector, index, self) => {
       const normalizedName = getConnectorName(connector);
+      // Filter out null names (like Enkrypt)
+      if (!normalizedName) return false;
       return index === self.findIndex((c) => getConnectorName(c) === normalizedName);
     });
 
@@ -141,8 +185,46 @@ function ConnectWalletModal({
                   disabled={isConnectingThis}
                   className="w-full flex items-center space-x-4 px-4 py-4 bg-gray-50 dark:bg-input-bg hover:bg-gray-100 dark:hover:bg-bg rounded-xl transition-all duration-200 border border-border hover:border-[color:var(--border-hover)] group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <div className="flex justify-center items-center w-10 h-10 text-2xl bg-gray-200 rounded-lg transition-transform dark:bg-bg group-hover:scale-110">
-                    {getConnectorIcon(connector)}
+                  <div className="flex overflow-hidden justify-center items-center w-10 h-10 bg-gray-200 rounded-lg transition-transform dark:bg-bg group-hover:scale-110">
+                    {(() => {
+                      const iconUrl = getConnectorIcon(connector);
+                      const walletName = getConnectorName(connector) || "Wallet";
+                      
+                      // Use emoji fallbacks for each wallet type
+                      const getEmojiFallback = (name: string) => {
+                        const lowerName = name.toLowerCase();
+                        if (lowerName.includes("metamask")) return "🦊";
+                        if (lowerName.includes("walletconnect")) return "🔗";
+                        if (lowerName.includes("coinbase")) return "🔵";
+                        if (lowerName.includes("kaia")) return "🟣";
+                        if (lowerName.includes("keplr")) return "🔷";
+                        if (lowerName.includes("okx")) return "🟠";
+                        return "💼";
+                      };
+                      
+                      return iconUrl ? (
+                        <img 
+                          src={iconUrl} 
+                          alt={walletName}
+                          className="w-full h-full object-contain p-1.5"
+                          loading="lazy"
+                          onError={(e) => {
+                            // Fallback to emoji if image fails to load
+                            const target = e.target as HTMLImageElement;
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('.fallback-emoji')) {
+                              target.style.display = 'none';
+                              const fallback = document.createElement('div');
+                              fallback.className = 'flex justify-center items-center text-2xl fallback-emoji';
+                              fallback.textContent = getEmojiFallback(walletName);
+                              parent.appendChild(fallback);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <span className="text-2xl">{getEmojiFallback(walletName)}</span>
+                      );
+                    })()}
                   </div>
                   <div className="flex-1 text-left">
                     <div className="font-semibold text-text-primary">{getConnectorName(connector)}</div>
@@ -154,6 +236,9 @@ function ConnectWalletModal({
                           {(connector.name?.toLowerCase().includes("coinbase") || connector.id?.toLowerCase().includes("coinbase")) && "Connect using Coinbase Wallet"}
                           {((connector.name?.toLowerCase().includes("kaia") || connector.name?.toLowerCase().includes("kaikas") || connector.name?.toLowerCase().includes("klaytn")) ||
                             (connector.id?.toLowerCase().includes("kaia") || connector.id?.toLowerCase().includes("kaikas") || connector.id?.toLowerCase().includes("klaytn"))) && "Connect using Kaia Wallet browser extension"}
+                          {((connector.name?.toLowerCase().includes("keplr")) || (connector.id?.toLowerCase().includes("keplr"))) && "Connect using Keplr browser extension"}
+                          {((connector.name?.toLowerCase().includes("okx") || connector.name?.toLowerCase().includes("okex")) || 
+                            (connector.id?.toLowerCase().includes("okx") || connector.id?.toLowerCase().includes("okex"))) && "Connect using OKX Wallet browser extension"}
                         </>
                       )}
                     </div>
