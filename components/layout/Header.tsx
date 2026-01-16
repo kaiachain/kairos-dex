@@ -63,6 +63,12 @@ function ConnectWalletModal({
     return "💼";
   };
 
+  // Filter out duplicate connectors based on normalized name
+  const uniqueConnectors = connectors.filter((connector, index, self) => {
+    const normalizedName = getConnectorName(connector);
+    return index === self.findIndex((c) => getConnectorName(c) === normalizedName);
+  });
+
   const handleConnect = async (connector: any) => {
     try {
       setConnectingId(connector.id);
@@ -99,7 +105,7 @@ function ConnectWalletModal({
           </p>
 
           <div className="space-y-2">
-            {connectors.map((connector) => {
+            {uniqueConnectors.map((connector) => {
               const isConnectingThis = connectingId === connector.id || (isConnecting && !connectingId);
               return (
                 <button
