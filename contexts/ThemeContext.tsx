@@ -1,4 +1,3 @@
-'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { ThemeMode, THEME_STORAGE_KEY } from '@/config/theme';

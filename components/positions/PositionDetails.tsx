@@ -1,4 +1,3 @@
-'use client';
 
 import { useState, useEffect } from 'react';
 import { usePositionDetails } from '@/hooks/usePositionDetails';
@@ -7,8 +6,7 @@ import { useWriteContract, useAccount, useReadContract, useWaitForTransactionRec
 import { CONTRACTS } from '@/config/contracts';
 import { PositionManager_ABI } from '@/abis/PositionManager';
 import { Plus, Minus, Coins, ExternalLink, Calendar, Zap, Trash2, Info, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link, useNavigate } from 'react-router-dom';
 import { parseUnits, formatUnits } from 'viem';
 
 interface PositionDetailsProps {
@@ -20,7 +18,7 @@ const FULL_RANGE_THRESHOLD = 1e40;
 const MAX_UINT128 = BigInt(2 ** 128 - 1);
 
 export function PositionDetails({ tokenId }: PositionDetailsProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { position, isLoading, refetch: refetchPosition } = usePositionDetails(tokenId);
@@ -309,7 +307,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
     <div className="space-y-6">
       {/* Back Button */}
       <button
-        onClick={() => router.push('/positions')}
+        onClick={() => navigate('/positions')}
         className="mb-4 text-primary hover:opacity-80 hover:underline"
       >
         ← Back to Positions
@@ -338,7 +336,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
         </div>
         {poolAddress && (
           <Link
-            href={`/pools/${poolAddress}`}
+            to={`/pools/${poolAddress}`}
             className="flex items-center gap-2 px-4 py-2 border-2 border-border text-text-primary rounded-lg hover:bg-gray-50 dark:hover:bg-input-bg hover:border-[color:var(--border-hover)] transition-all font-medium"
           >
             <span>View Pool</span>

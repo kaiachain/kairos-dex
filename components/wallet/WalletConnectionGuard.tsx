@@ -1,7 +1,6 @@
-"use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useLocation } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { showToast } from "@/lib/showToast";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
@@ -18,7 +17,8 @@ import { CHAIN_ID } from "@/config/env";
  * - /positions (Portfolio)
  */
 export function WalletConnectionGuard() {
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
   const { isConnected, isConnecting, isReconnecting, chainId } = useAccount();
   const { isCorrectChain, switchChain, chainId: hookChainId } = useWalletConnection();
   const [showChainSwitchModal, setShowChainSwitchModal] = useState(false);

@@ -1,4 +1,3 @@
-'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { ToastContainer, cssTransition } from 'react-toastify';

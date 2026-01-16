@@ -1,4 +1,3 @@
-'use client';
 
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Token } from '@/types/token';

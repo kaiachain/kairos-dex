@@ -1,4 +1,3 @@
-"use client";
 
 import { useTokenList } from "@/hooks/useTokenList";
 import { useTokenBalance } from "@/hooks/useTokenBalance";

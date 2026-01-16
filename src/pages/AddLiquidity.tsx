@@ -1,8 +1,6 @@
-'use client';
-
 import { Layout } from '@/components/layout/Layout';
 import { AddLiquidity } from '@/components/liquidity/AddLiquidity';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useTokenInfo } from '@/hooks/useTokenInfo';
 import { Token } from '@/types/token';
@@ -10,8 +8,8 @@ import { CHAIN_ID } from '@/config/env';
 import { useMemo } from 'react';
 
 export default function AddLiquidityPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   const token0Address = searchParams.get('token0');
   const token1Address = searchParams.get('token1');
@@ -69,7 +67,7 @@ export default function AddLiquidityPage() {
         {/* Content */}
         <div className="relative z-10 w-full max-w-[420px] space-y-8">
           <button
-            onClick={() => router.back()}
+            onClick={() => navigate(-1)}
             className="flex gap-2 items-center px-4 py-2 font-medium rounded-lg border-2 transition-all border-border text-text-primary hover:bg-gray-50 dark:hover:bg-input-bg hover:border-[color:var(--border-hover)]"
           >
             <ArrowLeft className="w-4 h-4" />

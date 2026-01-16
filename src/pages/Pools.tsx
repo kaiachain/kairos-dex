@@ -1,5 +1,3 @@
-'use client';
-
 import { Layout } from '@/components/layout/Layout';
 import { PoolExplorer } from '@/components/pools/PoolExplorer';
 import { CreatePool } from '@/components/pools/CreatePool';
@@ -68,4 +66,3 @@ export default function PoolsPage() {
     </Layout>
   );
 }
-

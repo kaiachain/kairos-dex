@@ -1,7 +1,4 @@
-'use client';
-
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeftRight, Droplets, Layers, BarChart3, Settings, Repeat, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -16,7 +13,8 @@ const navItems = [
 ];
 
 export function Navigation() {
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Close mobile menu when route changes
@@ -35,7 +33,7 @@ export function Navigation() {
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                to={item.href}
                 className={cn(
                   'relative flex items-center space-x-2 px-5 py-3 text-sm font-medium transition-all duration-200 rounded-xl group',
                   isActive
@@ -98,7 +96,7 @@ export function Navigation() {
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    to={item.href}
                     className={cn(
                       'flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200',
                       isActive

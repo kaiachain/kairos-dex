@@ -1,7 +1,6 @@
-'use client';
 
 import { useEffect, useMemo, useCallback } from 'react';
-import dynamic from 'next/dynamic';
+import { lazy, Suspense } from 'react';
 import { useAccount } from 'wagmi';
 import { TokenSelector } from './TokenSelector';
 import { SwapButton } from './SwapButton';
@@ -17,11 +16,8 @@ import { useSwapConfirmation } from '@/hooks/useSwapConfirmation';
 import { formatBalance } from '@/lib/utils';
 
 // Dynamically import SwapConfirmation to reduce initial bundle size
-const SwapConfirmation = dynamic(
-  () => import('./SwapConfirmation').then((mod) => ({ default: mod.SwapConfirmation })),
-  {
-    loading: () => null, // Modal doesn't need loading state
-  }
+const SwapConfirmation = lazy(
+  () => import('./SwapConfirmation').then((mod) => ({ default: mod.SwapConfirmation }))
 );
 
 export function SwapInterface() {
@@ -249,7 +245,8 @@ export function SwapInterface() {
 
       {/* Swap Confirmation Modal */}
       {showConfirmation && swapHash && swapDetails && (
-        <SwapConfirmation
+        <Suspense fallback={null}>
+          <SwapConfirmation
           tokenIn={swapDetails.tokenIn}
           tokenOut={swapDetails.tokenOut}
           amountIn={swapDetails.amountIn}
@@ -257,6 +254,7 @@ export function SwapInterface() {
           transactionHash={swapHash}
           onClose={closeConfirmation}
         />
+        </Suspense>
       )}
     </div>
   );

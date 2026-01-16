@@ -1,4 +1,3 @@
-'use client';
 
 import { LogOut, Copy, ExternalLink, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatAddress, formatBalance } from '@/lib/utils';

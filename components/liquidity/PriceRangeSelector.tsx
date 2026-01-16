@@ -1,4 +1,3 @@
-'use client';
 
 import { Token } from '@/types/token';
 

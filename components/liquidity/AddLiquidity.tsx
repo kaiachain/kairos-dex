@@ -1,4 +1,3 @@
-"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { TokenSelector } from "@/components/swap/TokenSelector";

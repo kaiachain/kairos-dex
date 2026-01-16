@@ -1,7 +1,6 @@
 import { Layout } from '@/components/layout/Layout';
 import { PositionList } from '@/components/positions/PositionList';
 import { TokenBalances } from '@/components/positions/TokenBalances';
-import { AddLiquidity } from '@/components/liquidity/AddLiquidity';
 
 export default function PositionsPage() {
   return (
@@ -16,4 +15,3 @@ export default function PositionsPage() {
     </Layout>
   );
 }
-

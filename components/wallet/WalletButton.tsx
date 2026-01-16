@@ -1,4 +1,3 @@
-'use client';
 
 import { Wallet, RefreshCw, AlertCircle, ChevronDown } from 'lucide-react';
 import { formatAddress } from '@/lib/utils';

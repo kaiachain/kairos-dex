@@ -7,19 +7,24 @@
 import { useState, useEffect, useMemo } from "react";
 import { Token } from "@/types/token";
 import { SwapQuote } from "@/types/swap";
-import { CurrencyAmount, TradeType, ChainId } from "@uniswap/sdk-core";
+import { CurrencyAmount, TradeType, ChainId, Token as SDKToken } from "@uniswap/sdk-core";
 import { getAddress } from "@ethersproject/address";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { usePublicClient } from "wagmi";
 import { RPC_URL } from "@/config/env";
 import { getRouterInstance } from "@/lib/router-instance";
 import { fromReadableAmount, TokenAmount } from "@/lib/router-setup";
-import { formatUnits } from "@/lib/utils";
+import { formatUnits, parseUnits } from "@/lib/utils";
 import { addStatusMessage } from "@/hooks/useSwapStatus";
+import { CONTRACTS } from "@/config/contracts";
+import { QuoterV2_ABI } from "@/abis/QuoterV2";
+import { getPoolAddress, getPoolInfo } from "@/lib/sdk-utils";
+import { FeeAmount } from "@uniswap/v3-sdk";
+import { Contract } from "@ethersproject/contracts";
+import { Percent } from "@uniswap/sdk-core";
 
 // Convert app Token to SDK Token
 function tokenToSDKToken(token: Token) {
-  const { Token: SDKToken } = require("@uniswap/sdk-core");
   return new SDKToken(
     ChainId.MAINNET,
     getAddress(token.address),
@@ -47,14 +52,6 @@ async function getFastQuoteFromQuoter(
   poolAddress: string;
 } | null> {
   try {
-    const { CONTRACTS } = require('@/config/contracts');
-    const { QuoterV2_ABI } = require('@/abis/QuoterV2');
-    const { parseUnits, formatUnits } = require('@/lib/utils');
-    const { getPoolAddress } = require('@/lib/sdk-utils');
-    const { FeeAmount } = require('@uniswap/v3-sdk');
-    const { Contract } = require('@ethersproject/contracts');
-    const { JsonRpcProvider } = require('@ethersproject/providers');
-    const { RPC_URL } = require('@/config/env');
     
     // Try common fee tiers in order of likelihood (0.05%, 0.3%, 1%, then others)
     // Start with fee 100 (0.01%) since that's what the pool uses
@@ -127,7 +124,6 @@ async function getFastQuoteFromQuoter(
           
           // Fallback: Calculate optimistic quote from pool state (instant)
           try {
-            const { getPoolInfo } = require('@/lib/sdk-utils');
             const poolInfo = await getPoolInfo(poolAddress);
             
             if (poolInfo && poolInfo.sqrtPriceX96 && poolInfo.liquidity > BigInt(0)) {
@@ -224,7 +220,6 @@ async function getQuoteFromRouter(
     const amountInCurrency = TokenAmount(sdkTokenIn, rawTokenAmountIn.toString());
 
     // Create swap options
-    const { Percent } = require("@uniswap/sdk-core");
     const options = {
       recipient: "0x0000000000000000000000000000000000000000", // Not needed for quote
       slippageTolerance: new Percent(50, 10_000), // 0.5% default
@@ -387,7 +382,6 @@ async function getQuoteFromRouter(
         console.log('✅ Quote extracted using toFixed():', amountOut);
       } else if (quote.quotient !== undefined) {
         // CurrencyAmount object - extract from quotient
-        const { formatUnits } = require('@/lib/utils');
         const quotient = typeof quote.quotient === 'bigint' 
           ? quote.quotient 
           : BigInt(quote.quotient.toString());
@@ -840,8 +834,6 @@ export function useSwapQuote(
         let hasDirectPool = false;
         if (publicClient) {
           try {
-            const { getPoolAddress } = require('@/lib/sdk-utils');
-            const { FeeAmount } = require('@uniswap/v3-sdk');
             // Quick check: try most common fee tiers first
             const commonFees = [100, FeeAmount.LOW, FeeAmount.MEDIUM, FeeAmount.HIGH];
             for (const fee of commonFees) {
@@ -1075,7 +1067,6 @@ export async function getRouterRoute(
           const SwapType = routerModule.SwapType;
           
           // Create swap options with execution parameters
-          const { Percent } = require("@uniswap/sdk-core");
           const options = {
             recipient,
             slippageTolerance: new Percent(Math.floor(slippageTolerance * 100), 10_000),
@@ -1127,7 +1118,6 @@ export async function getRouterRoute(
     const amountInCurrency = TokenAmount(sdkTokenIn, rawTokenAmountIn.toString());
 
     // Create swap options
-    const { Percent } = require("@uniswap/sdk-core");
     const options = {
       recipient,
       slippageTolerance: new Percent(Math.floor(slippageTolerance * 100), 10_000),

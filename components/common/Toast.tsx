@@ -1,4 +1,3 @@
-'use client';
 
 import { ReactNode, MouseEventHandler, memo } from 'react';
 

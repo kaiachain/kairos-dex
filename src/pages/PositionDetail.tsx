@@ -1,11 +1,20 @@
 import { Layout } from '@/components/layout/Layout';
 import { PositionDetails } from '@/components/positions/PositionDetails';
+import { useParams } from 'react-router-dom';
 
-export default function PositionDetailPage({
-  params,
-}: {
-  params: { tokenId: string };
-}) {
+export default function PositionDetailPage() {
+  const { tokenId } = useParams<{ tokenId: string }>();
+
+  if (!tokenId) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <p className="text-error">Position token ID is required</p>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="relative min-h-[calc(100vh-200px)] flex flex-col items-center justify-center p-4 overflow-hidden">
@@ -18,10 +27,9 @@ export default function PositionDetailPage({
 
         {/* Position Details Content */}
         <div className="relative z-10 w-full max-w-4xl space-y-6">
-          <PositionDetails tokenId={params.tokenId} />
+          <PositionDetails tokenId={tokenId} />
         </div>
       </div>
     </Layout>
   );
 }
-

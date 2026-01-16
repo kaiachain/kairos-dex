@@ -5,6 +5,8 @@
 
 import { Token, CurrencyAmount, ChainId } from '@uniswap/sdk-core';
 import { Provider } from '@ethersproject/providers';
+import JSBI from 'jsbi';
+import { ethers } from 'ethers';
 import state from '../state.json';
 
 // Backward compatibility: TokenAmount -> CurrencyAmount
@@ -25,16 +27,22 @@ if (!(CurrencyAmount.prototype as any).raw) {
  * Setup router patches for KAIA chain
  * Following execute-swap-sdk.js setupRouterPatches function
  */
-export function setupRouterPatches(
+export async function setupRouterPatches(
   chainId: number,
   WKAIA_TOKEN: Token,
   USDT_TOKEN: Token
 ) {
   try {
-    const chainsUtil = require('@uniswap/smart-order-router/build/main/util/chains');
-    const addressesUtil = require('@uniswap/smart-order-router/build/main/util/addresses');
-    const configUtil = require('@uniswap/smart-order-router/build/main/routers/alpha-router/config');
-    const gasModelUtil = require('@uniswap/smart-order-router/build/main/routers/alpha-router/gas-models/gas-model');
+    const chainsUtilModule = await import('@uniswap/smart-order-router/build/main/util/chains');
+    const addressesUtilModule = await import('@uniswap/smart-order-router/build/main/util/addresses');
+    const configUtilModule = await import('@uniswap/smart-order-router/build/main/routers/alpha-router/config');
+    const gasModelUtilModule = await import('@uniswap/smart-order-router/build/main/routers/alpha-router/gas-models/gas-model');
+    
+    // Handle both default and named exports
+    const chainsUtil = chainsUtilModule.default || chainsUtilModule;
+    const addressesUtil = addressesUtilModule.default || addressesUtilModule;
+    const configUtil = configUtilModule.default || configUtilModule;
+    const gasModelUtil = gasModelUtilModule.default || gasModelUtilModule;
     
     // Patch chain ID mapping
     const originalIDToChainId = chainsUtil.ID_TO_CHAIN_ID;
@@ -95,7 +103,7 @@ export function setupRouterPatches(
  */
 export function patchTokenEquals() {
   try {
-    const TokenClass = require('@uniswap/sdk-core').Token;
+    const TokenClass = Token;
     const originalTokenEquals = TokenClass.prototype.equals;
     TokenClass.prototype.equals = function(other: any) {
       if (!other || !this || !other.chainId || !this.chainId) return false;
@@ -120,7 +128,7 @@ export function patchTokenEquals() {
  */
 export function patchCurrencyAmount() {
   try {
-    const TokenAmountClass = require('@uniswap/sdk-core').CurrencyAmount;
+    const TokenAmountClass = CurrencyAmount;
     
     // Patch subtract
     const originalSubtract = TokenAmountClass.prototype.subtract;
@@ -159,16 +167,16 @@ export function patchCurrencyAmount() {
  * Create custom multicall provider
  * Following execute-swap-sdk.js createMulticallProvider function
  */
-export function createMulticallProvider(
+export async function createMulticallProvider(
   chainId: number,
   provider: Provider,
   multicallAddress: string
 ) {
   try {
-    const { UniswapInterfaceMulticall__factory } = require('@uniswap/smart-order-router/build/main/types/v3/factories/UniswapInterfaceMulticall__factory');
-    const IMulticallProvider = require('@uniswap/smart-order-router/build/main/providers/multicall-provider').IMulticallProvider;
-    const lodash = require('lodash');
-    const { ethers } = require('ethers');
+    const multicallFactoryModule = await import('@uniswap/smart-order-router/build/main/types/v3/factories/UniswapInterfaceMulticall__factory');
+    const UniswapInterfaceMulticall__factory = multicallFactoryModule.UniswapInterfaceMulticall__factory || multicallFactoryModule.default?.UniswapInterfaceMulticall__factory || multicallFactoryModule.default;
+    const multicallProviderModule = await import('@uniswap/smart-order-router/build/main/providers/multicall-provider');
+    const IMulticallProvider = multicallProviderModule.IMulticallProvider || multicallProviderModule.default?.IMulticallProvider || multicallProviderModule.default;
     
     class CustomMulticallProvider extends IMulticallProvider {
       public chainId: number;
@@ -188,7 +196,7 @@ export function createMulticallProvider(
         const { addresses, contractInterface, functionName, functionParams, providerConfig } = params;
         const fragment = contractInterface.getFunction(functionName);
         const callData = contractInterface.encodeFunctionData(fragment, functionParams);
-        const calls = lodash.map(addresses, (address: string) => ({
+        const calls = addresses.map((address: string) => ({
           target: address,
           callData,
           gasLimit: this.gasLimitPerCall,
@@ -209,7 +217,7 @@ export function createMulticallProvider(
         const { address, contractInterface, functionName, functionParams, additionalConfig, providerConfig } = params;
         const fragment = contractInterface.getFunction(functionName);
         const gasLimitPerCall = additionalConfig?.gasLimitPerCallOverride || this.gasLimitPerCall;
-        const calls = lodash.map(functionParams, (functionParam: any) => ({
+        const calls = functionParams.map((functionParam: any) => ({
           target: address,
           callData: contractInterface.encodeFunctionData(fragment, functionParam),
           gasLimit: gasLimitPerCall,
@@ -234,7 +242,7 @@ export function createMulticallProvider(
       async callMultipleFunctionsOnSameContract(params: any) {
         const { address, contractInterface, functionNames, functionParams, additionalConfig } = params;
         const gasLimitPerCall = additionalConfig?.gasLimitPerCallOverride || this.gasLimitPerCall;
-        const calls = lodash.map(functionNames, (functionName: string, i: number) => ({
+        const calls = functionNames.map((functionName: string, i: number) => ({
           target: address,
           callData: contractInterface.encodeFunctionData(contractInterface.getFunction(functionName), functionParams?.[i] || []),
           gasLimit: gasLimitPerCall,
@@ -262,7 +270,6 @@ export function createMulticallProvider(
  * Following execute-swap-sdk.js fromReadableAmount function
  */
 export function fromReadableAmount(amount: number, decimals: number): bigint {
-  const JSBI = require('jsbi');
   const extraDigits = Math.pow(10, countDecimals(amount));
   const adjustedAmount = amount * extraDigits;
   return JSBI.toNumber(JSBI.divide(

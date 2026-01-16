@@ -1,7 +1,5 @@
-'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
 import { ChevronDown, X, RefreshCw } from 'lucide-react';
 import { WalletConnector } from '@/types/wallet';
 import { useClickOutside } from '@/hooks/useClickOutside';
@@ -102,28 +100,24 @@ export function ConnectWalletModal({
                 >
                   <div className="flex overflow-hidden justify-center items-center w-10 h-10 bg-gray-200 rounded-lg transition-transform dark:bg-bg group-hover:scale-110">
                     {iconUrl ? (
-                      <div className="relative w-full h-full">
-                        <Image
-                          src={iconUrl}
-                          alt={walletName}
-                          fill
-                          className="object-contain p-1.5"
-                          loading="lazy"
-                          unoptimized // External wallet icons may not be optimized
-                          onError={(e) => {
-                            // Fallback to emoji if image fails to load
-                            const target = e.target as HTMLImageElement;
-                            const parent = target.parentElement;
-                            if (parent && !parent.querySelector('.fallback-emoji')) {
-                              target.style.display = 'none';
-                              const fallback = document.createElement('div');
-                              fallback.className = 'flex justify-center items-center text-2xl fallback-emoji';
-                              fallback.textContent = getEmojiFallback(walletName);
-                              parent.appendChild(fallback);
-                            }
-                          }}
-                        />
-                      </div>
+                      <img
+                        src={iconUrl}
+                        alt={walletName}
+                        className="w-full h-full object-contain p-1.5"
+                        loading="lazy"
+                        onError={(e) => {
+                          // Fallback to emoji if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          const parent = target.parentElement;
+                          if (parent && !parent.querySelector('.fallback-emoji')) {
+                            target.style.display = 'none';
+                            const fallback = document.createElement('div');
+                            fallback.className = 'flex justify-center items-center text-2xl fallback-emoji';
+                            fallback.textContent = getEmojiFallback(walletName);
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
                     ) : (
                       <span className="text-2xl">{getEmojiFallback(walletName)}</span>
                     )}

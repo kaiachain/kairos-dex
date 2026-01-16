@@ -1,4 +1,3 @@
-"use client";
 
 import { useAccount, useConnect, useDisconnect, useBalance, useChainId, useSwitchChain } from "wagmi";
 import { useEffect, useState, useCallback, useRef } from "react";

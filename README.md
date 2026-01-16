@@ -101,7 +101,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ```bash
 npm run build
-npm start
+```
+
+The build output will be in the `dist/` directory. To preview the production build:
+
+```bash
+npm run preview
 ```
 
 ## Contract Addresses
@@ -117,11 +122,13 @@ Contract addresses are configured via environment variables. Default values (for
 - **V3Migrator**: `0xDab424Aba37f24A94f568Df345634d4B66830ebB`
 - **V3Staker**: `0xc3cF7B37E5020f718aceE1f4e1b12bC7b1C6CE4B`
 
-To use different addresses, set the corresponding `NEXT_PUBLIC_*` environment variables.
+To use different addresses, set the corresponding `NEXT_PUBLIC_*` environment variables (the prefix is kept for compatibility).
 
 ## Tech Stack
 
-- **Next.js 14** - React framework
+- **Vite** - Build tool and dev server
+- **React 18** - UI library
+- **React Router** - Client-side routing
 - **TypeScript** - Type safety
 - **wagmi** - Ethereum React hooks
 - **viem** - TypeScript Ethereum library
@@ -132,18 +139,22 @@ To use different addresses, set the corresponding `NEXT_PUBLIC_*` environment va
 
 ```
 /ui
-├── app/                 # Next.js app directory
-│   ├── layout.tsx      # Root layout
-│   ├── page.tsx        # Home/Swap page
-│   ├── pools/          # Pools pages
-│   ├── positions/      # Positions pages
-│   └── explore/        # Analytics pages
+├── src/                 # Source code
+│   ├── pages/          # Page components
+│   │   ├── Home.tsx    # Home/Swap page
+│   │   ├── Pools.tsx   # Pools page
+│   │   ├── Positions.tsx # Positions page
+│   │   └── ...         # Other pages
+│   ├── App.tsx         # Root component with routing
+│   ├── main.tsx        # Entry point
+│   ├── providers.tsx   # App providers (wagmi, react-query, etc.)
+│   └── globals.css     # Global styles
 ├── components/          # React components
 │   ├── layout/         # Layout components
 │   ├── swap/           # Swap interface
 │   ├── pools/          # Pool components
 │   ├── positions/      # Position components
-│   ├── liquidity/     # Liquidity components
+│   ├── liquidity/      # Liquidity components
 │   └── analytics/      # Analytics components
 ├── hooks/              # Custom React hooks
 ├── types/              # TypeScript types

@@ -1,12 +1,8 @@
-"use client";
-
 import { Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { CHAIN_NAME } from "@/config/env";
-import Link from "next/link";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "react-router-dom";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { useConnect } from "wagmi";
 import { showToast } from "@/lib/showToast";
@@ -40,7 +36,8 @@ export function Header() {
   } = useWalletConnection();
   
   const { connectors } = useConnect();
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -137,15 +134,14 @@ export function Header() {
       <div className="container px-4 mx-auto sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2">
             <div className="flex overflow-hidden justify-center items-center w-8 h-8 rounded-lg">
-              <Image 
+              <img 
                 src="/icon.png" 
                 alt="Kairos DEX" 
                 width={32}
                 height={32}
                 className="object-contain w-full h-full"
-                priority
               />
             </div>
             <span className="text-xl font-semibold text-text-primary">Kairos DEX</span>
@@ -158,7 +154,7 @@ export function Header() {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  to={item.href}
                   className={cn(
                     "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
                     isActive
@@ -239,7 +235,7 @@ export function Header() {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  to={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "block px-4 py-2 text-sm font-medium rounded-lg transition-colors",

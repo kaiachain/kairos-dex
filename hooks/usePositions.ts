@@ -12,7 +12,7 @@ import {
   SubgraphCollect,
 } from "@/types/subgraph";
 import { aggregatePositionEvents } from "@/lib/subgraph-utils";
-import { queryKeys } from "@/app/providers";
+import { queryKeys } from "@/src/providers";
 
 export interface PositionWithEvents extends Position {
   mintCount: number;

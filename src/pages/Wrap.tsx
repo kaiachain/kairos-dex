@@ -1,5 +1,3 @@
-'use client';
-
 import { Layout } from '@/components/layout/Layout';
 import { WrapInterface } from '@/components/wrap/WrapInterface';
 
@@ -20,4 +18,3 @@ export default function WrapPage() {
     </Layout>
   );
 }
-

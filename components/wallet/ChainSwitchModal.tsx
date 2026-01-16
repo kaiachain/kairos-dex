@@ -1,4 +1,3 @@
-'use client';
 
 import { RefreshCw, X } from 'lucide-react';
 import { useRef, useEffect } from 'react';

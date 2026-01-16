@@ -4,7 +4,7 @@ import { query } from '@/lib/graphql';
 import { GET_POOLS_QUERY } from '@/lib/graphql-queries';
 import { SubgraphPoolsResponse } from '@/types/subgraph';
 import { subgraphPoolToPool } from '@/lib/subgraph-utils';
-import { queryKeys } from '@/app/providers';
+import { queryKeys } from '@/src/providers';
 
 async function fetchPoolsFromSubgraph(): Promise<Pool[]> {
   const response = await query<SubgraphPoolsResponse>(GET_POOLS_QUERY, {

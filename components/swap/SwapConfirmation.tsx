@@ -1,4 +1,3 @@
-'use client';
 
 import { CheckCircle2, ExternalLink, X } from 'lucide-react';
 import { Token } from '@/types/token';

@@ -1,16 +1,15 @@
-"use client";
 
 import { usePositions } from "@/hooks/usePositions";
 import { PositionCard } from "./PositionCard";
 import { Plus } from "lucide-react";
 import { useAccount } from "wagmi";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { showToast } from "@/lib/showToast";
 
 export function PositionList() {
   const { positions, isLoading } = usePositions();
   const { isConnected } = useAccount();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const handleCreatePositionClick = () => {
     if (!isConnected) {
@@ -20,7 +19,7 @@ export function PositionList() {
         description: 'Please connect your wallet first to create a position',
       });
     } else {
-      router.push('/add-liquidity');
+      navigate('/add-liquidity');
     }
   };
 

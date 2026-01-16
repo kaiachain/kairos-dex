@@ -1,7 +1,5 @@
-'use client';
-
 import React from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { Pool } from '@/types/pool';
 import { formatCurrency, formatNumber, formatAddress } from '@/lib/utils';
 
@@ -11,7 +9,7 @@ interface PoolCardProps {
 
 function PoolCardComponent({ pool }: PoolCardProps) {
   return (
-    <Link href={`/pools/${pool.address}`}>
+    <Link to={`/pools/${pool.address}`}>
       <div className="bg-white dark:bg-card rounded-xl p-6 border border-border hover:shadow-lg transition-shadow cursor-pointer">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">

@@ -10,7 +10,7 @@ import { query } from '@/lib/graphql';
 import { GET_POOL_BY_ADDRESS_QUERY } from '@/lib/graphql-queries';
 import { SubgraphPoolResponse } from '@/types/subgraph';
 import { subgraphPoolToPool } from '@/lib/subgraph-utils';
-import { queryKeys } from '@/app/providers';
+import { queryKeys } from '@/src/providers';
 
 // Helper function to calculate price from sqrtPriceX96
 function calculatePriceFromSqrtPriceX96(sqrtPriceX96: bigint, token0Decimals: number, token1Decimals: number): number {

@@ -1,4 +1,3 @@
-'use client';
 
 import {
   CONTRACT_V3_CORE_FACTORY,
@@ -9,7 +8,6 @@ import {
 } from '@/config/env';
 import { ExternalLink, Copy, Check, Building2, Factory, Route, Layers } from 'lucide-react';
 import { useState } from 'react';
-import Image from 'next/image';
 
 interface ContractLinkProps {
   address: string;
@@ -75,13 +73,12 @@ function BrandSection() {
     <div>
       <div className="flex items-center space-x-2 mb-2">
         <div className="w-6 h-6 rounded flex items-center justify-center overflow-hidden">
-          <Image 
+          <img 
             src="/icon.png" 
             alt="Kairos DEX" 
             width={24}
             height={24}
             className="w-full h-full object-contain"
-            priority
           />
         </div>
         <h3 className="text-base font-bold text-text-primary">
