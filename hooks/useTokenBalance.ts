@@ -1,4 +1,4 @@
-import { useReadContract, useAccount } from 'wagmi';
+import { useReadContract, useAccount, useBalance } from 'wagmi';
 import { erc20Abi } from 'viem';
 import { Token } from '@/types/token';
 import { formatUnits } from '@/lib/utils';
@@ -17,7 +17,7 @@ export function useTokenBalance(token: Token | null) {
   });
 
   // For native token, use useBalance from wagmi
-  const { data: nativeBalance } = useAccount();
+  const { data: nativeBalance } = useBalance({ address });
 
   if (!token) return { data: null, isLoading: false, refetch: async () => ({ data: null }) };
 

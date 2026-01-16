@@ -13,7 +13,7 @@ export function TokenAmount(token: Token, rawAmount: string | bigint) {
 }
 
 // Add 'raw' property for backward compatibility
-if (!CurrencyAmount.prototype.raw) {
+if (!(CurrencyAmount.prototype as any).raw) {
   Object.defineProperty(CurrencyAmount.prototype, 'raw', {
     get: function() { return this.quotient },
     enumerable: true,

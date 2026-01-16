@@ -30,15 +30,17 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
 
       setIsCalculating(true);
       try {
-        const impact = await calculatePriceImpact(
-          amountIn,
-          quote.amountOut,
-          tokenIn,
-          tokenOut,
-          quote.poolAddress,
-          quote.fee
-        );
-        setPriceImpact(impact);
+        if (quote.fee !== undefined && quote.poolAddress) {
+          const impact = await calculatePriceImpact(
+            amountIn,
+            quote.amountOut,
+            tokenIn,
+            tokenOut,
+            quote.poolAddress,
+            quote.fee
+          );
+          setPriceImpact(impact);
+        }
       } catch (error) {
         console.error('Error calculating price impact:', error);
       } finally {
