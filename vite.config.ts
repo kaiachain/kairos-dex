@@ -42,6 +42,8 @@ export default defineConfig({
     ],
   },
   define: {
+    // Note: Vite uses import.meta.env, not process.env
+    // We keep this empty object for compatibility with libraries that expect process.env
     'process.env': {},
     global: 'globalThis',
     'Browser': 'undefined',

@@ -6,7 +6,7 @@
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { ChainId, Token as SDKToken } from "@uniswap/sdk-core";
 import { getAddress } from "@ethersproject/address";
-import { CHAIN_ID, RPC_URL, SUBGRAPH_URL, CONTRACT_WRAPPED_NATIVE_TOKEN } from "@/config/env";
+import { CHAIN_ID, RPC_URL, SUBGRAPH_URL, SUBGRAPH_BEARER_TOKEN, CONTRACT_WRAPPED_NATIVE_TOKEN } from "@/config/env";
 import state from "../state.json";
 import {
   setupRouterPatches,
@@ -381,7 +381,7 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
       0.01,
       Number.MAX_VALUE,
       SUBGRAPH_URL,
-      process.env.NEXT_PUBLIC_SUBGRAPH_BEARER_TOKEN || "d1c0ffba8f198132674e26bb04cec97d"
+      SUBGRAPH_BEARER_TOKEN
     );
 
     // Optimize pool provider - allow retries for multi-hop routes

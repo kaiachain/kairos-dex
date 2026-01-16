@@ -10,7 +10,6 @@ import {
   NATIVE_CURRENCY_SYMBOL,
   NATIVE_CURRENCY_DECIMALS,
   RPC_URL,
-  RPC_URL_PUBLIC,
   BLOCK_EXPLORER_NAME,
   BLOCK_EXPLORER_URL,
   WALLETCONNECT_PROJECT_ID,
@@ -33,7 +32,7 @@ export const kairosTestnet = defineChain({
       http: [RPC_URL],
     },
     public: {
-      http: [RPC_URL_PUBLIC],
+      http: [RPC_URL],
     },
   },
   blockExplorers: {
