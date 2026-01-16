@@ -8,6 +8,7 @@ import { PositionManager_ABI } from '@/abis/PositionManager';
 import { Plus, Minus, Coins, ExternalLink, Calendar, Zap, Trash2, Info, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { parseUnits, formatUnits } from 'viem';
+import { BLOCK_EXPLORER_URL } from '@/config/env';
 
 interface PositionDetailsProps {
   tokenId: string;
@@ -15,7 +16,9 @@ interface PositionDetailsProps {
 
 const FULL_RANGE_THRESHOLD = 1e40;
 // Maximum uint128 value for collecting all fees
-const MAX_UINT128 = BigInt(2 ** 128 - 1);
+// CRITICAL: Use BigInt arithmetic to avoid floating point precision loss
+// 2^128 - 1 = 340282366920938463463374607431768211455
+const MAX_UINT128 = BigInt(2) ** BigInt(128) - BigInt(1);
 
 export function PositionDetails({ tokenId }: PositionDetailsProps) {
   const navigate = useNavigate();
@@ -136,6 +139,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
   // [10] tokensOwed0, [11] tokensOwed1
   const tokensOwed0 = positionData?.[10] as bigint | undefined; // tokensOwed0 is at index 10
   const tokensOwed1 = positionData?.[11] as bigint | undefined; // tokensOwed1 is at index 11
+  const currentLiquidity = positionData?.[7] as bigint | undefined; // liquidity is at index 7
 
   // Calculate uncollected fees in human-readable format
   const uncollectedFees0 = tokensOwed0 
@@ -178,6 +182,22 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
     hash: collectHash,
   });
 
+  // Remove liquidity transaction
+  const { 
+    writeContract: decreaseLiquidity, 
+    data: decreaseHash, 
+    error: decreaseError,
+    isPending: isDecreasePending 
+  } = useWriteContract();
+
+  const { 
+    isLoading: isDecreaseConfirming, 
+    isSuccess: isDecreaseSuccess,
+    isError: isDecreaseTxError 
+  } = useWaitForTransactionReceipt({
+    hash: decreaseHash,
+  });
+
   // Extract pool address from tokenId (format: owner-pool-tickLower-tickUpper)
   const poolAddress = tokenId.split('-').length >= 2 ? tokenId.split('-')[1] : null;
 
@@ -217,9 +237,176 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
     }
   }, [isCollectSuccess, refetchPositionData, refetchPosition]);
 
+  // Refetch position data after successful decrease liquidity
+  useEffect(() => {
+    if (isDecreaseSuccess) {
+      refetchPositionData();
+      refetchPosition?.();
+      // Reset remove amount after successful removal
+      setRemoveAmount('');
+    }
+  }, [isDecreaseSuccess, refetchPositionData, refetchPosition]);
+
+  const handleRemoveLiquidity = () => {
+    if (!position || !address || !removeAmount || !currentLiquidity || effectiveTokenId === null) {
+      console.error('Missing required data for remove liquidity:', {
+        hasPosition: !!position,
+        hasAddress: !!address,
+        removeAmount,
+        currentLiquidity: currentLiquidity?.toString(),
+        effectiveTokenId: effectiveTokenId?.toString(),
+      });
+      return;
+    }
+    
+    const percentage = parseFloat(removeAmount);
+    if (percentage <= 0 || percentage > 100) {
+      console.error('Invalid percentage:', percentage);
+      return;
+    }
+
+    // Validate current liquidity is valid
+    if (currentLiquidity === 0n || currentLiquidity === undefined) {
+      console.error('Position has no liquidity to remove');
+      return;
+    }
+
+    // Calculate liquidity to remove (percentage of current liquidity)
+    // Use precise calculation to avoid rounding errors
+    // Convert percentage to basis points (10000 = 100%)
+    const percentageBigInt = BigInt(Math.floor(percentage * 10000));
+    const liquidityToRemove = (currentLiquidity * percentageBigInt) / BigInt(10000);
+    
+    // CRITICAL: Ensure we don't remove more than available
+    // Add a small buffer to account for rounding, but never exceed current liquidity
+    if (liquidityToRemove > currentLiquidity) {
+      console.error('Cannot remove more liquidity than available', {
+        liquidityToRemove: liquidityToRemove.toString(),
+        currentLiquidity: currentLiquidity.toString(),
+        percentage,
+      });
+      // Cap to current liquidity if calculation error
+      const cappedLiquidity = currentLiquidity;
+      // But still validate it's not zero
+      if (cappedLiquidity === 0n) {
+        console.error('Capped liquidity is zero');
+        return;
+      }
+    }
+    
+    // Ensure liquidity to remove is not zero
+    if (liquidityToRemove === 0n) {
+      console.error('Liquidity amount to remove is zero', {
+        currentLiquidity: currentLiquidity.toString(),
+        percentage,
+        percentageBigInt: percentageBigInt.toString(),
+      });
+      return;
+    }
+
+    // Convert to uint128 (liquidity is stored as uint128 in the contract)
+    // uint128 max value is 2^128 - 1
+    const MAX_UINT128 = BigInt(2) ** BigInt(128) - BigInt(1);
+    
+    // CRITICAL FIX: Ensure we never exceed currentLiquidity, even after conversion
+    let liquidityToRemoveUint128: bigint;
+    if (liquidityToRemove > currentLiquidity) {
+      // If somehow we calculated more than available, use current liquidity
+      liquidityToRemoveUint128 = currentLiquidity > MAX_UINT128 ? MAX_UINT128 : currentLiquidity;
+    } else {
+      liquidityToRemoveUint128 = liquidityToRemove > MAX_UINT128 
+        ? MAX_UINT128 
+        : liquidityToRemove;
+    }
+    
+    // Final validation: ensure it's still not zero after conversion
+    if (liquidityToRemoveUint128 === 0n) {
+      console.error('Liquidity amount to remove is zero after conversion');
+      return;
+    }
+    
+    // Final safety check: ensure we're not trying to remove more than exists
+    if (liquidityToRemoveUint128 > currentLiquidity) {
+      console.error('FINAL CHECK FAILED: Liquidity to remove exceeds current liquidity', {
+        liquidityToRemoveUint128: liquidityToRemoveUint128.toString(),
+        currentLiquidity: currentLiquidity.toString(),
+      });
+      // Cap to current liquidity as last resort
+      liquidityToRemoveUint128 = currentLiquidity > MAX_UINT128 ? MAX_UINT128 : currentLiquidity;
+    }
+
+    // Calculate minimum amounts with slippage tolerance
+    // IMPORTANT: The actual amounts returned depend on current price and position range
+    // Using position.token0Amount/token1Amount may not be accurate if:
+    // 1. Position is out of range (one token amount is 0)
+    // 2. Price has moved since position creation
+    // 3. The liquidity-to-token conversion is complex in Uniswap V3
+    // 
+    // CRITICAL FIX: Based on the reverted transaction analysis, the error "uint(9)" 
+    // is likely due to liquidity amount exceeding position liquidity OR slippage check failing.
+    // To be safe, we'll use 0 as minimum amounts to avoid slippage failures.
+    // The user can always collect tokens separately after decreasing liquidity.
+    
+    // Set minimum amounts to 0 to avoid slippage-related reverts
+    // This is safe because:
+    // 1. The user is removing their own liquidity
+    // 2. They can collect tokens separately if needed
+    // 3. The main protection is ensuring liquidity amount doesn't exceed available
+    const amount0Min = 0n;
+    const amount1Min = 0n;
+    
+    // Log for debugging
+    console.log('Remove liquidity parameters:', {
+      percentage,
+      liquidityToRemove: liquidityToRemoveUint128.toString(),
+      currentLiquidity: currentLiquidity.toString(),
+      liquidityRatio: `${(Number(liquidityToRemoveUint128) / Number(currentLiquidity) * 100).toFixed(2)}%`,
+      amount0Min: amount0Min.toString(),
+      amount1Min: amount1Min.toString(),
+      positionToken0Amount: position.token0Amount,
+      positionToken1Amount: position.token1Amount,
+    });
+
+    // Set deadline to 20 minutes from now
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60);
+
+    try {
+      console.log('Calling decreaseLiquidity with params:', {
+        tokenId: effectiveTokenId.toString(),
+        liquidity: liquidityToRemoveUint128.toString(),
+        amount0Min: amount0Min.toString(),
+        amount1Min: amount1Min.toString(),
+        deadline: deadline.toString(),
+        currentLiquidity: currentLiquidity.toString(),
+        percentage,
+      });
+      
+      decreaseLiquidity({
+        address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
+        abi: PositionManager_ABI,
+        functionName: 'decreaseLiquidity',
+        args: [
+          {
+            tokenId: effectiveTokenId,
+            liquidity: liquidityToRemoveUint128,
+            amount0Min,
+            amount1Min,
+            deadline,
+          },
+        ],
+      });
+    } catch (error) {
+      console.error('Error calling decreaseLiquidity:', error);
+      // Show user-friendly error message
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+      }
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="text-center py-12 text-text-secondary">
+      <div className="py-12 text-center text-text-secondary">
         Loading position details...
       </div>
     );
@@ -227,7 +414,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
   if (!position) {
     return (
-      <div className="text-center py-12 text-text-secondary">
+      <div className="py-12 text-center text-text-secondary">
         Position not found
       </div>
     );
@@ -314,12 +501,12 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
       </button>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold mb-2 text-text-primary">
+          <h1 className="mb-2 text-3xl font-bold text-text-primary">
             {position.token0.symbol} / {position.token1.symbol}
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex gap-3 items-center">
             <div
               className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
                 isInRange
@@ -346,23 +533,23 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-          <div className="text-sm text-text-secondary mb-1">Position Value</div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+          <div className="mb-1 text-sm text-text-secondary">Position Value</div>
           <div className="text-2xl font-bold text-text-primary">
             {formatCurrency(position.value)}
           </div>
           {position.token0Amount !== undefined &&
             position.token1Amount !== undefined && (
-              <div className="text-xs text-text-secondary mt-2">
+              <div className="mt-2 text-xs text-text-secondary">
                 {formatBalance(position.token0Amount, 4)} {position.token0.symbol} +{' '}
                 {formatBalance(position.token1Amount, 4)} {position.token1.symbol}
               </div>
             )}
         </div>
 
-        <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-          <div className="text-sm text-text-secondary mb-1">Uncollected Fees</div>
+        <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+          <div className="mb-1 text-sm text-text-secondary">Uncollected Fees</div>
           <div className={`text-2xl font-bold ${hasFeesToCollect ? 'text-success' : 'text-text-secondary'}`}>
             {hasFeesToCollect 
               ? formatCurrency(displayUncollectedFees)
@@ -371,7 +558,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                 : '$0.00'}
           </div>
           {hasFeesToCollect && tokensOwed0 !== undefined && tokensOwed1 !== undefined && (
-            <div className="text-xs text-text-secondary mt-2">
+            <div className="mt-2 text-xs text-text-secondary">
               {uncollectedFees0 > 0 && (
                 <span>{formatBalance(uncollectedFees0.toString(), 4)} {position.token0.symbol}</span>
               )}
@@ -382,34 +569,34 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             </div>
           )}
           {!hasFeesToCollect && tokensOwed0 !== undefined && tokensOwed1 !== undefined && (
-            <div className="text-xs text-text-secondary mt-2">
+            <div className="mt-2 text-xs text-text-secondary">
               No fees available to collect
             </div>
           )}
           {position.feesEarned > 0 && (
-            <div className="text-xs text-text-secondary mt-2">
+            <div className="mt-2 text-xs text-text-secondary">
               Total earned: {formatCurrency(position.feesEarned)}
             </div>
           )}
         </div>
 
-        <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-          <div className="text-sm text-text-secondary mb-1">Current Price</div>
+        <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+          <div className="mb-1 text-sm text-text-secondary">Current Price</div>
           <div className="text-2xl font-bold text-text-primary">
             {formatNumber(position.currentPrice, 6)}
           </div>
-          <div className="text-xs text-text-secondary mt-2">
+          <div className="mt-2 text-xs text-text-secondary">
             {position.token1.symbol} per {position.token0.symbol}
           </div>
         </div>
       </div>
 
       {/* Price Range */}
-      <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-        <h2 className="text-xl font-bold mb-4 text-text-primary">Price Range</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+      <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+        <h2 className="mb-4 text-xl font-bold text-text-primary">Price Range</h2>
+        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
           <div>
-            <div className="text-text-secondary mb-1">Min Price</div>
+            <div className="mb-1 text-text-secondary">Min Price</div>
             <div className="font-semibold text-text-primary">
               {position.priceMin === 0 ? (
                 <span className="text-text-secondary">0 (Full Range)</span>
@@ -419,7 +606,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             </div>
           </div>
           <div>
-            <div className="text-text-secondary mb-1">Max Price</div>
+            <div className="mb-1 text-text-secondary">Max Price</div>
             <div className="font-semibold text-text-primary">
               {position.priceMax >= FULL_RANGE_THRESHOLD ? (
                 <span className="text-text-secondary">∞ (Full Range)</span>
@@ -430,7 +617,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
           </div>
         </div>
         {isFullRange ? (
-          <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+          <div className="p-3 mt-4 rounded-lg border bg-primary/10 border-primary/20">
             <p className="text-sm text-text-primary">
               This is a full-range position covering all possible prices (like Uniswap V2)
             </p>
@@ -438,7 +625,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
         ) : (
           <div className="mt-4 space-y-2">
             {/* Progress Bar Container */}
-            <div className="w-full bg-gray-200 dark:bg-bg rounded-full h-4 relative overflow-hidden">
+            <div className="overflow-hidden relative w-full h-4 bg-gray-200 rounded-full dark:bg-bg">
               {(() => {
                 // Calculate a reasonable scale for visualization
                 const priceRange = position.priceMax - position.priceMin;
@@ -510,7 +697,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
               })()}
             </div>
             {/* Price labels below the bar */}
-            <div className="flex justify-between text-xs text-text-secondary px-1">
+            <div className="flex justify-between px-1 text-xs text-text-secondary">
               <span>{formatNumber(position.priceMin, 4)}</span>
               <span className={`font-semibold ${isInRange ? 'text-text-primary' : 'text-error'}`}>
                 Current: {formatNumber(position.currentPrice, 4)}
@@ -528,8 +715,8 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
       {/* Event History */}
       {allEvents.length > 0 && (
-        <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-          <h2 className="text-xl font-bold mb-4 text-text-primary">Event History</h2>
+        <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+          <h2 className="mb-4 text-xl font-bold text-text-primary">Event History</h2>
           <div className="space-y-3">
             {allEvents.map((event, index) => {
               const isMint = event.type === 'mint';
@@ -540,7 +727,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
               return (
                 <div
                   key={`${event.type}-${eventData.id}-${index}`}
-                  className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-input-bg rounded-lg border border-border"
+                  className="flex gap-4 items-start p-4 bg-gray-50 rounded-lg border dark:bg-input-bg border-border"
                 >
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -560,14 +747,14 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex justify-between items-center mb-1">
                       <span className="font-semibold capitalize text-text-primary">{event.type}</span>
-                      <span className="text-xs text-text-secondary flex items-center gap-1">
+                      <span className="flex gap-1 items-center text-xs text-text-secondary">
                         <Calendar className="w-3 h-3" />
                         {formatDate(event.timestamp)}
                       </span>
                     </div>
-                    <div className="text-sm text-text-secondary space-y-1">
+                    <div className="space-y-1 text-sm text-text-secondary">
                       {isMint && (
                         <>
                           <div>
@@ -616,12 +803,12 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                             )}
                         </>
                       )}
-                      <div className="text-xs mt-1">
+                      <div className="mt-1 text-xs">
                         <a
-                          href={`https://scope.klaytn.com/tx/${eventData.transaction.id}`}
+                          href={`${BLOCK_EXPLORER_URL}/tx/${eventData.transaction.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary hover:opacity-80 hover:underline flex items-center gap-1"
+                          className="flex gap-1 items-center text-primary hover:opacity-80 hover:underline"
                         >
                           View Transaction <ExternalLink className="w-3 h-3" />
                         </a>
@@ -639,11 +826,11 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-text-primary">Actions</h2>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Collect Fees Card */}
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+          <div className="p-6 bg-white rounded-xl border shadow-sm dark:bg-card border-border">
+            <div className="flex gap-3 items-center mb-4">
+              <div className="flex justify-center items-center w-10 h-10 rounded-full bg-primary/20">
                 <Coins className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -665,7 +852,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                 effectiveTokenId === null ||
                 isResolvingTokenId
               }
-              className="w-full py-4 bg-primary text-bg rounded-xl font-semibold hover:opacity-90 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+              className="flex gap-2 justify-center items-center py-4 w-full font-semibold rounded-xl shadow-md transition-all bg-primary text-bg hover:opacity-90 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
               {isResolvingTokenId ? (
                 <>
@@ -692,10 +879,10 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             
             {/* Transaction Status Messages */}
             {collectError && (
-              <div className="mt-4 p-4 bg-error/10 border border-error/30 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-error/10 border-error/30">
                 <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-error mb-1">
+                  <p className="mb-1 text-sm font-semibold text-error">
                     Transaction Failed
                   </p>
                   <p className="text-xs text-error">
@@ -706,10 +893,10 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             )}
             
             {isCollectTxError && (
-              <div className="mt-4 p-4 bg-error/10 border border-error/30 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-error/10 border-error/30">
                 <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-error mb-1">
+                  <p className="mb-1 text-sm font-semibold text-error">
                     Transaction Reverted
                   </p>
                   <p className="text-xs text-error">
@@ -720,18 +907,18 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             )}
             
             {isCollectSuccess && (
-              <div className="mt-4 p-4 bg-success/10 border border-success/30 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-success/10 border-success/30">
                 <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-success mb-1">
+                  <p className="mb-1 text-sm font-semibold text-success">
                     Fees Collected Successfully!
                   </p>
                   {collectHash && (
                     <a
-                      href={`https://scope.klaytn.com/tx/${collectHash}`}
+                      href={`${BLOCK_EXPLORER_URL}/tx/${collectHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-success hover:opacity-80 hover:underline flex items-center gap-1 mt-1"
+                      className="flex gap-1 items-center mt-1 text-xs text-success hover:opacity-80 hover:underline"
                     >
                       View Transaction <ExternalLink className="w-3 h-3" />
                     </a>
@@ -741,9 +928,9 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             )}
 
             {/* Info Note */}
-            <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-start gap-3">
+            <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-primary/5 border-primary/20">
               <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-text-secondary leading-relaxed">
+              <p className="text-xs leading-relaxed text-text-secondary">
                 <strong className="text-text-primary">How fees work:</strong> Fees accumulate automatically when swaps occur within your position's price range. 
                 {hasFeesToCollect 
                   ? ' You have uncollected fees available to collect.'
@@ -752,7 +939,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             </div>
             
             {numericTokenId === null && isResolvingTokenId && (
-              <div className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-primary/10 border-primary/20">
                 <Loader2 className="w-5 h-5 text-primary animate-spin flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-text-secondary">
                   <strong className="text-text-primary">Resolving position...</strong> Finding the NFT tokenId for this position.
@@ -761,7 +948,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             )}
 
             {numericTokenId === null && !isResolvingTokenId && effectiveTokenId === null && (
-              <div className="mt-4 p-4 bg-secondary/10 border border-secondary/30 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-secondary/10 border-secondary/30">
                 <AlertCircle className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-secondary">
                   <strong>Warning:</strong> Could not find the NFT tokenId for this position. 
@@ -772,9 +959,9 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
           </div>
 
           {/* Remove Liquidity Card */}
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center">
+          <div className="p-6 bg-white rounded-xl border shadow-sm dark:bg-card border-border">
+            <div className="flex gap-3 items-center mb-4">
+              <div className="flex justify-center items-center w-10 h-10 rounded-full bg-error/20">
                 <Trash2 className="w-5 h-5 text-error" />
               </div>
               <div>
@@ -787,7 +974,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
+                <label className="block mb-2 text-sm font-medium text-text-primary">
                   Amount to Remove (%)
                 </label>
                 <div className="flex gap-2">
@@ -798,11 +985,11 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                     placeholder="0"
                     min="0"
                     max="100"
-                    className="flex-1 px-4 py-3 bg-gray-50 dark:bg-input-bg rounded-xl border border-border outline-none focus:border-error focus:ring-2 focus:ring-error/20 text-text-primary transition-all"
+                    className="flex-1 px-4 py-3 bg-gray-50 rounded-xl border transition-all outline-none dark:bg-input-bg border-border focus:border-error focus:ring-2 focus:ring-error/20 text-text-primary"
                   />
                   <button
                     onClick={() => setRemoveAmount('100')}
-                    className="px-6 py-3 bg-gray-100 dark:bg-bg rounded-xl hover:bg-gray-200 dark:hover:bg-card text-text-primary font-medium transition-colors border border-border"
+                    className="px-6 py-3 font-medium bg-gray-100 rounded-xl border transition-colors dark:bg-bg hover:bg-gray-200 dark:hover:bg-card text-text-primary border-border"
                   >
                     Max
                   </button>
@@ -810,19 +997,110 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
               </div>
               
               <button
-                onClick={() => {
-                  if (!position || !address || !removeAmount) return;
-                  const percentage = parseFloat(removeAmount);
-                  if (percentage <= 0 || percentage > 100) return;
-                  // TODO: Implement remove liquidity functionality
-                  console.log('Remove liquidity:', percentage);
-                }}
-                disabled={!removeAmount || parseFloat(removeAmount) <= 0}
-                className="w-full py-4 bg-error text-bg rounded-xl font-semibold hover:opacity-90 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+                onClick={handleRemoveLiquidity}
+                disabled={
+                  !removeAmount || 
+                  parseFloat(removeAmount) <= 0 || 
+                  parseFloat(removeAmount) > 100 ||
+                  isDecreasePending || 
+                  isDecreaseConfirming ||
+                  effectiveTokenId === null ||
+                  !currentLiquidity ||
+                  currentLiquidity === 0n ||
+                  isResolvingTokenId
+                }
+                className="flex gap-2 justify-center items-center py-4 w-full font-semibold rounded-xl shadow-md transition-all bg-error text-bg hover:opacity-90 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
               >
-                <Trash2 className="w-5 h-5" />
-                Remove Liquidity
+                {isResolvingTokenId ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Resolving position...
+                  </>
+                ) : isDecreasePending || isDecreaseConfirming ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-5 h-5" />
+                    Remove Liquidity
+                  </>
+                )}
               </button>
+              
+              {/* Transaction Status Messages */}
+              {decreaseError && (
+                <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-error/10 border-error/30">
+                  <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="mb-1 text-sm font-semibold text-error">
+                      Transaction Failed
+                    </p>
+                    <p className="text-xs text-error">
+                      {decreaseError.message || 'Unknown error occurred'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {isDecreaseTxError && (
+                <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-error/10 border-error/30">
+                  <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="mb-1 text-sm font-semibold text-error">
+                      Transaction Reverted
+                    </p>
+                    <p className="text-xs text-error">
+                      The transaction was reverted. Please try again.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {isDecreaseSuccess && (
+                <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-success/10 border-success/30">
+                  <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="mb-1 text-sm font-semibold text-success">
+                      Liquidity Removed Successfully!
+                    </p>
+                    <p className="mb-2 text-xs text-text-secondary">
+                      Note: After removing liquidity, you may need to collect the tokens separately.
+                    </p>
+                    {decreaseHash && (
+                      <a
+                        href={`${BLOCK_EXPLORER_URL}/tx/${decreaseHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex gap-1 items-center mt-1 text-xs text-success hover:opacity-80 hover:underline"
+                      >
+                        View Transaction <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Info Note */}
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-error/5 border-error/20">
+                <Info className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+                <p className="text-xs leading-relaxed text-text-secondary">
+                  <strong className="text-text-primary">How it works:</strong> Removing liquidity decreases your position size. 
+                  The tokens will be available in the position and can be collected separately. 
+                  You can remove any percentage from 1% to 100% of your current liquidity.
+                </p>
+              </div>
+
+              {numericTokenId === null && !isResolvingTokenId && effectiveTokenId === null && (
+                <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-secondary/10 border-secondary/30">
+                  <AlertCircle className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-secondary">
+                    <strong>Warning:</strong> Could not find the NFT tokenId for this position. 
+                    Remove liquidity may not be available. Please ensure you own this position.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { PositionManager_ABI } from '@/abis/PositionManager';
 import { Plus, Minus, Coins, ExternalLink, Calendar, Zap, Trash2, Info, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { parseUnits, formatUnits } from 'viem';
+import { BLOCK_EXPLORER_URL } from '@/config/env';
 
 interface PositionDetailsProps {
   tokenId: string;
@@ -219,7 +220,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
   if (isLoading) {
     return (
-      <div className="text-center py-12 text-text-secondary">
+      <div className="py-12 text-center text-text-secondary">
         Loading position details...
       </div>
     );
@@ -227,7 +228,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
   if (!position) {
     return (
-      <div className="text-center py-12 text-text-secondary">
+      <div className="py-12 text-center text-text-secondary">
         Position not found
       </div>
     );
@@ -314,12 +315,12 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
       </button>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold mb-2 text-text-primary">
+          <h1 className="mb-2 text-3xl font-bold text-text-primary">
             {position.token0.symbol} / {position.token1.symbol}
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex gap-3 items-center">
             <div
               className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
                 isInRange
@@ -346,23 +347,23 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-          <div className="text-sm text-text-secondary mb-1">Position Value</div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+          <div className="mb-1 text-sm text-text-secondary">Position Value</div>
           <div className="text-2xl font-bold text-text-primary">
             {formatCurrency(position.value)}
           </div>
           {position.token0Amount !== undefined &&
             position.token1Amount !== undefined && (
-              <div className="text-xs text-text-secondary mt-2">
+              <div className="mt-2 text-xs text-text-secondary">
                 {formatBalance(position.token0Amount, 4)} {position.token0.symbol} +{' '}
                 {formatBalance(position.token1Amount, 4)} {position.token1.symbol}
               </div>
             )}
         </div>
 
-        <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-          <div className="text-sm text-text-secondary mb-1">Uncollected Fees</div>
+        <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+          <div className="mb-1 text-sm text-text-secondary">Uncollected Fees</div>
           <div className={`text-2xl font-bold ${hasFeesToCollect ? 'text-success' : 'text-text-secondary'}`}>
             {hasFeesToCollect 
               ? formatCurrency(displayUncollectedFees)
@@ -371,7 +372,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                 : '$0.00'}
           </div>
           {hasFeesToCollect && tokensOwed0 !== undefined && tokensOwed1 !== undefined && (
-            <div className="text-xs text-text-secondary mt-2">
+            <div className="mt-2 text-xs text-text-secondary">
               {uncollectedFees0 > 0 && (
                 <span>{formatBalance(uncollectedFees0.toString(), 4)} {position.token0.symbol}</span>
               )}
@@ -382,34 +383,34 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             </div>
           )}
           {!hasFeesToCollect && tokensOwed0 !== undefined && tokensOwed1 !== undefined && (
-            <div className="text-xs text-text-secondary mt-2">
+            <div className="mt-2 text-xs text-text-secondary">
               No fees available to collect
             </div>
           )}
           {position.feesEarned > 0 && (
-            <div className="text-xs text-text-secondary mt-2">
+            <div className="mt-2 text-xs text-text-secondary">
               Total earned: {formatCurrency(position.feesEarned)}
             </div>
           )}
         </div>
 
-        <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-          <div className="text-sm text-text-secondary mb-1">Current Price</div>
+        <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+          <div className="mb-1 text-sm text-text-secondary">Current Price</div>
           <div className="text-2xl font-bold text-text-primary">
             {formatNumber(position.currentPrice, 6)}
           </div>
-          <div className="text-xs text-text-secondary mt-2">
+          <div className="mt-2 text-xs text-text-secondary">
             {position.token1.symbol} per {position.token0.symbol}
           </div>
         </div>
       </div>
 
       {/* Price Range */}
-      <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-        <h2 className="text-xl font-bold mb-4 text-text-primary">Price Range</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+      <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+        <h2 className="mb-4 text-xl font-bold text-text-primary">Price Range</h2>
+        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
           <div>
-            <div className="text-text-secondary mb-1">Min Price</div>
+            <div className="mb-1 text-text-secondary">Min Price</div>
             <div className="font-semibold text-text-primary">
               {position.priceMin === 0 ? (
                 <span className="text-text-secondary">0 (Full Range)</span>
@@ -419,7 +420,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             </div>
           </div>
           <div>
-            <div className="text-text-secondary mb-1">Max Price</div>
+            <div className="mb-1 text-text-secondary">Max Price</div>
             <div className="font-semibold text-text-primary">
               {position.priceMax >= FULL_RANGE_THRESHOLD ? (
                 <span className="text-text-secondary">∞ (Full Range)</span>
@@ -430,7 +431,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
           </div>
         </div>
         {isFullRange ? (
-          <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+          <div className="p-3 mt-4 rounded-lg border bg-primary/10 border-primary/20">
             <p className="text-sm text-text-primary">
               This is a full-range position covering all possible prices (like Uniswap V2)
             </p>
@@ -438,7 +439,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
         ) : (
           <div className="mt-4 space-y-2">
             {/* Progress Bar Container */}
-            <div className="w-full bg-gray-200 dark:bg-bg rounded-full h-4 relative overflow-hidden">
+            <div className="overflow-hidden relative w-full h-4 bg-gray-200 rounded-full dark:bg-bg">
               {(() => {
                 // Calculate a reasonable scale for visualization
                 const priceRange = position.priceMax - position.priceMin;
@@ -510,7 +511,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
               })()}
             </div>
             {/* Price labels below the bar */}
-            <div className="flex justify-between text-xs text-text-secondary px-1">
+            <div className="flex justify-between px-1 text-xs text-text-secondary">
               <span>{formatNumber(position.priceMin, 4)}</span>
               <span className={`font-semibold ${isInRange ? 'text-text-primary' : 'text-error'}`}>
                 Current: {formatNumber(position.currentPrice, 4)}
@@ -528,8 +529,8 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
       {/* Event History */}
       {allEvents.length > 0 && (
-        <div className="bg-white dark:bg-card rounded-xl p-6 border border-border">
-          <h2 className="text-xl font-bold mb-4 text-text-primary">Event History</h2>
+        <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
+          <h2 className="mb-4 text-xl font-bold text-text-primary">Event History</h2>
           <div className="space-y-3">
             {allEvents.map((event, index) => {
               const isMint = event.type === 'mint';
@@ -540,7 +541,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
               return (
                 <div
                   key={`${event.type}-${eventData.id}-${index}`}
-                  className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-input-bg rounded-lg border border-border"
+                  className="flex gap-4 items-start p-4 bg-gray-50 rounded-lg border dark:bg-input-bg border-border"
                 >
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -560,14 +561,14 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex justify-between items-center mb-1">
                       <span className="font-semibold capitalize text-text-primary">{event.type}</span>
-                      <span className="text-xs text-text-secondary flex items-center gap-1">
+                      <span className="flex gap-1 items-center text-xs text-text-secondary">
                         <Calendar className="w-3 h-3" />
                         {formatDate(event.timestamp)}
                       </span>
                     </div>
-                    <div className="text-sm text-text-secondary space-y-1">
+                    <div className="space-y-1 text-sm text-text-secondary">
                       {isMint && (
                         <>
                           <div>
@@ -616,12 +617,12 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                             )}
                         </>
                       )}
-                      <div className="text-xs mt-1">
+                      <div className="mt-1 text-xs">
                         <a
-                          href={`https://scope.klaytn.com/tx/${eventData.transaction.id}`}
+                          href={`${BLOCK_EXPLORER_URL}/tx/${eventData.transaction.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary hover:opacity-80 hover:underline flex items-center gap-1"
+                          className="flex gap-1 items-center text-primary hover:opacity-80 hover:underline"
                         >
                           View Transaction <ExternalLink className="w-3 h-3" />
                         </a>
@@ -639,11 +640,11 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-text-primary">Actions</h2>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Collect Fees Card */}
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+          <div className="p-6 bg-white rounded-xl border shadow-sm dark:bg-card border-border">
+            <div className="flex gap-3 items-center mb-4">
+              <div className="flex justify-center items-center w-10 h-10 rounded-full bg-primary/20">
                 <Coins className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -665,7 +666,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                 effectiveTokenId === null ||
                 isResolvingTokenId
               }
-              className="w-full py-4 bg-primary text-bg rounded-xl font-semibold hover:opacity-90 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+              className="flex gap-2 justify-center items-center py-4 w-full font-semibold rounded-xl shadow-md transition-all bg-primary text-bg hover:opacity-90 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
               {isResolvingTokenId ? (
                 <>
@@ -692,10 +693,10 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             
             {/* Transaction Status Messages */}
             {collectError && (
-              <div className="mt-4 p-4 bg-error/10 border border-error/30 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-error/10 border-error/30">
                 <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-error mb-1">
+                  <p className="mb-1 text-sm font-semibold text-error">
                     Transaction Failed
                   </p>
                   <p className="text-xs text-error">
@@ -706,10 +707,10 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             )}
             
             {isCollectTxError && (
-              <div className="mt-4 p-4 bg-error/10 border border-error/30 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-error/10 border-error/30">
                 <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-error mb-1">
+                  <p className="mb-1 text-sm font-semibold text-error">
                     Transaction Reverted
                   </p>
                   <p className="text-xs text-error">
@@ -720,18 +721,18 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             )}
             
             {isCollectSuccess && (
-              <div className="mt-4 p-4 bg-success/10 border border-success/30 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-success/10 border-success/30">
                 <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-success mb-1">
+                  <p className="mb-1 text-sm font-semibold text-success">
                     Fees Collected Successfully!
                   </p>
                   {collectHash && (
                     <a
-                      href={`https://scope.klaytn.com/tx/${collectHash}`}
+                      href={`${BLOCK_EXPLORER_URL}/tx/${collectHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-success hover:opacity-80 hover:underline flex items-center gap-1 mt-1"
+                      className="flex gap-1 items-center mt-1 text-xs text-success hover:opacity-80 hover:underline"
                     >
                       View Transaction <ExternalLink className="w-3 h-3" />
                     </a>
@@ -741,9 +742,9 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             )}
 
             {/* Info Note */}
-            <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-start gap-3">
+            <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-primary/5 border-primary/20">
               <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-text-secondary leading-relaxed">
+              <p className="text-xs leading-relaxed text-text-secondary">
                 <strong className="text-text-primary">How fees work:</strong> Fees accumulate automatically when swaps occur within your position's price range. 
                 {hasFeesToCollect 
                   ? ' You have uncollected fees available to collect.'
@@ -752,7 +753,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             </div>
             
             {numericTokenId === null && isResolvingTokenId && (
-              <div className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-primary/10 border-primary/20">
                 <Loader2 className="w-5 h-5 text-primary animate-spin flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-text-secondary">
                   <strong className="text-text-primary">Resolving position...</strong> Finding the NFT tokenId for this position.
@@ -761,7 +762,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             )}
 
             {numericTokenId === null && !isResolvingTokenId && effectiveTokenId === null && (
-              <div className="mt-4 p-4 bg-secondary/10 border border-secondary/30 rounded-lg flex items-start gap-3">
+              <div className="flex gap-3 items-start p-4 mt-4 rounded-lg border bg-secondary/10 border-secondary/30">
                 <AlertCircle className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-secondary">
                   <strong>Warning:</strong> Could not find the NFT tokenId for this position. 
@@ -772,9 +773,9 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
           </div>
 
           {/* Remove Liquidity Card */}
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-border shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-error/20 flex items-center justify-center">
+          <div className="p-6 bg-white rounded-xl border shadow-sm dark:bg-card border-border">
+            <div className="flex gap-3 items-center mb-4">
+              <div className="flex justify-center items-center w-10 h-10 rounded-full bg-error/20">
                 <Trash2 className="w-5 h-5 text-error" />
               </div>
               <div>
@@ -787,7 +788,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
+                <label className="block mb-2 text-sm font-medium text-text-primary">
                   Amount to Remove (%)
                 </label>
                 <div className="flex gap-2">
@@ -798,11 +799,11 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                     placeholder="0"
                     min="0"
                     max="100"
-                    className="flex-1 px-4 py-3 bg-gray-50 dark:bg-input-bg rounded-xl border border-border outline-none focus:border-error focus:ring-2 focus:ring-error/20 text-text-primary transition-all"
+                    className="flex-1 px-4 py-3 bg-gray-50 rounded-xl border transition-all outline-none dark:bg-input-bg border-border focus:border-error focus:ring-2 focus:ring-error/20 text-text-primary"
                   />
                   <button
                     onClick={() => setRemoveAmount('100')}
-                    className="px-6 py-3 bg-gray-100 dark:bg-bg rounded-xl hover:bg-gray-200 dark:hover:bg-card text-text-primary font-medium transition-colors border border-border"
+                    className="px-6 py-3 font-medium bg-gray-100 rounded-xl border transition-colors dark:bg-bg hover:bg-gray-200 dark:hover:bg-card text-text-primary border-border"
                   >
                     Max
                   </button>
@@ -818,7 +819,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                   console.log('Remove liquidity:', percentage);
                 }}
                 disabled={!removeAmount || parseFloat(removeAmount) <= 0}
-                className="w-full py-4 bg-error text-bg rounded-xl font-semibold hover:opacity-90 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+                className="flex gap-2 justify-center items-center py-4 w-full font-semibold rounded-xl shadow-md transition-all bg-error text-bg hover:opacity-90 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
               >
                 <Trash2 className="w-5 h-5" />
                 Remove Liquidity
