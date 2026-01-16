@@ -6,8 +6,7 @@
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { ChainId, Token as SDKToken } from "@uniswap/sdk-core";
 import { getAddress } from "@ethersproject/address";
-import { CHAIN_ID, RPC_URL, SUBGRAPH_URL, SUBGRAPH_BEARER_TOKEN, CONTRACT_WRAPPED_NATIVE_TOKEN } from "@/config/env";
-import state from "../state.json";
+import { CHAIN_ID, RPC_URL, SUBGRAPH_URL, SUBGRAPH_BEARER_TOKEN, CONTRACT_WRAPPED_NATIVE_TOKEN, CONTRACT_MULTICALL2 } from "@/config/env";
 import {
   setupRouterPatches,
   patchTokenEquals,
@@ -368,7 +367,7 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
     const multicall2Provider = await createMulticallProvider(
       CHAIN_ID,
       rpcProvider,
-      state.multicall2Address
+      CONTRACT_MULTICALL2
     );
 
     // Optimize subgraph provider - balance between speed and multi-hop support

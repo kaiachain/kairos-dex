@@ -90,7 +90,7 @@ export const SUBGRAPH_BEARER_TOKEN = getEnvVar(
 );
 
 // App Configuration
-export const APP_NAME = getEnvVar("APP_NAME", "Uniswap V3 DEX");
+export const APP_NAME = getEnvVar("APP_NAME", "Kairos DEX");
 export const IS_TESTNET =
   getEnvVar("IS_TESTNET", "true") === "true" ||
   getEnvVar("IS_TESTNET", "true") === undefined;

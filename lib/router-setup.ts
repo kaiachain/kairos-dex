@@ -7,7 +7,7 @@ import { Token, CurrencyAmount, ChainId } from '@uniswap/sdk-core';
 import { Provider } from '@ethersproject/providers';
 import JSBI from 'jsbi';
 import { ethers } from 'ethers';
-import state from '../state.json';
+import { CONTRACT_V3_CORE_FACTORY, CONTRACT_QUOTER_V2 } from '@/config/env';
 
 // Backward compatibility: TokenAmount -> CurrencyAmount
 export function TokenAmount(token: Token, rawAmount: string | bigint) {
@@ -70,8 +70,8 @@ export async function setupRouterPatches(
     };
     
     // Patch factory and quoter addresses
-    const factoryAddress = state.v3CoreFactoryAddress;
-    const quoterV2Address = state.quoterV2Address;
+    const factoryAddress = CONTRACT_V3_CORE_FACTORY;
+    const quoterV2Address = CONTRACT_QUOTER_V2;
     // @ts-ignore - These are readonly properties that need to be patched for Kaia chain
     if (!addressesUtil.V3_CORE_FACTORY_ADDRESSES) addressesUtil.V3_CORE_FACTORY_ADDRESSES = {};
     // @ts-ignore
