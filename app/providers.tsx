@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { wagmiConfig } from '@/config/wagmi';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ToastThemedContainer } from '@/components/common/ToastThemedContainer';
+import { WalletConnectionMonitor } from '@/components/wallet/WalletConnectionMonitor';
 import { useState } from 'react';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -14,6 +15,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider>
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
+          <WalletConnectionMonitor />
           {children}
           {/* Main toast container */}
           <ToastThemedContainer />

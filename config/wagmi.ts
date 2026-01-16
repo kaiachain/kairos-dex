@@ -1,6 +1,7 @@
 import { createConfig, http } from "wagmi";
 import { defineChain } from "viem";
 import { metaMask, walletConnect, coinbaseWallet } from "wagmi/connectors";
+import { createStorage } from "wagmi";
 import {
   CHAIN_ID,
   CHAIN_NAME,
@@ -75,6 +76,11 @@ function getConnectors() {
   return connectors;
 }
 
+// Create storage with localStorage for persistence across page navigations
+const storage = typeof window !== "undefined" 
+  ? createStorage({ storage: window.localStorage })
+  : undefined;
+
 export const wagmiConfig = createConfig({
   chains: [kairosTestnet],
   connectors: getConnectors(),
@@ -82,4 +88,5 @@ export const wagmiConfig = createConfig({
     [kairosTestnet.id]: http(),
   },
   ssr: true,
+  storage,
 });

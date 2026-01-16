@@ -182,12 +182,12 @@ body.modal-open {
   --toast-error-accent: rgb(var(--toast-error-base));
   --toast-error-icon-bg: rgba(var(--toast-error-base), 0.12);
   
-  /* Warning/Secondary: #9e9e9e */
-  --toast-warning-base: 158, 158, 158;
-  --toast-warning-bg: rgba(var(--toast-warning-base), 0.08);
-  --toast-warning-border: rgba(var(--toast-warning-base), 0.2);
+  /* Warning: #F59E0B (Amber) */
+  --toast-warning-base: 245, 158, 11;
+  --toast-warning-bg: rgba(var(--toast-warning-base), 0.12);
+  --toast-warning-border: rgba(var(--toast-warning-base), 0.3);
   --toast-warning-accent: rgb(var(--toast-warning-base));
-  --toast-warning-icon-bg: rgba(var(--toast-warning-base), 0.12);
+  --toast-warning-icon-bg: rgba(var(--toast-warning-base), 0.18);
   
   /* Info: Uses success color (#57CF3F) */
   --toast-info-base: 87, 207, 63;
@@ -213,12 +213,12 @@ body.modal-open {
   --toast-error-accent: rgb(var(--toast-error-base));
   --toast-error-icon-bg: rgba(var(--toast-error-base), 0.18);
   
-  /* Warning/Secondary: #667085 */
-  --toast-warning-base: 102, 112, 133;
-  --toast-warning-bg: rgba(var(--toast-warning-base), 0.12);
-  --toast-warning-border: rgba(var(--toast-warning-base), 0.3);
+  /* Warning: #F59E0B (Amber) */
+  --toast-warning-base: 245, 158, 11;
+  --toast-warning-bg: rgba(var(--toast-warning-base), 0.15);
+  --toast-warning-border: rgba(var(--toast-warning-base), 0.35);
   --toast-warning-accent: rgb(var(--toast-warning-base));
-  --toast-warning-icon-bg: rgba(var(--toast-warning-base), 0.18);
+  --toast-warning-icon-bg: rgba(var(--toast-warning-base), 0.2);
   
   /* Info: Uses success color (#40AB2B) */
   --toast-info-base: 64, 171, 43;
