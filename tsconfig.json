@@ -18,10 +18,14 @@
       "@/features/*": ["./src/features/*"],
       "@/shared/*": ["./src/shared/*"],
       "@/app/*": ["./src/app/*"],
-      "@/lib/*": ["./lib/*"]
+      "@/lib/*": ["./lib/*"],
+      "@/components/*": ["./components/*"],
+      "@/hooks/*": ["./hooks/*"],
+      "@/config/*": ["./config/*"],
+      "@/types/*": ["./types/*"]
     }
   },
-  "include": ["src", "config", "lib", "abis", "types"],
-  "exclude": ["node_modules", "dist", "components", "hooks"]
+  "include": ["src", "config", "lib", "abis", "types", "components", "hooks", "contexts", "services", "constants"],
+  "exclude": ["node_modules", "dist"]
 }
 
