@@ -1,6 +1,7 @@
 import { createConfig, http } from "wagmi";
 import { defineChain } from "viem";
-import { metaMask, walletConnect, coinbaseWallet } from "wagmi/connectors";
+import { metaMask, walletConnect, coinbaseWallet, injected } from "wagmi/connectors";
+import { createStorage } from "wagmi";
 import {
   CHAIN_ID,
   CHAIN_NAME,
@@ -9,7 +10,6 @@ import {
   NATIVE_CURRENCY_SYMBOL,
   NATIVE_CURRENCY_DECIMALS,
   RPC_URL,
-  RPC_URL_PUBLIC,
   BLOCK_EXPLORER_NAME,
   BLOCK_EXPLORER_URL,
   WALLETCONNECT_PROJECT_ID,
@@ -32,7 +32,7 @@ export const kairosTestnet = defineChain({
       http: [RPC_URL],
     },
     public: {
-      http: [RPC_URL_PUBLIC],
+      http: [RPC_URL],
     },
   },
   blockExplorers: {
@@ -48,8 +48,25 @@ export const kairosTestnet = defineChain({
 function getConnectors() {
   const connectors: ReturnType<typeof metaMask>[] = [metaMask()];
 
-  // Only add WalletConnect and Coinbase Wallet on client side
+  // Only add WalletConnect, Coinbase Wallet, and Kaia Wallet on client side
   if (typeof window !== "undefined") {
+    // Add Kaia Wallet (injected wallet via window.klaytn)
+    // Always add it so users can see it in the list, even if not installed
+    try {
+      const kaiaConnector = injected({
+        target: {
+          id: "kaia",
+          name: "Kaia Wallet",
+          provider: () => (window as any).klaytn || undefined,
+        },
+        shimDisconnect: true,
+      }) as any;
+      
+      connectors.push(kaiaConnector);
+    } catch (error) {
+      console.warn("Failed to initialize Kaia Wallet:", error);
+    }
+
     if (
       WALLETCONNECT_PROJECT_ID &&
       WALLETCONNECT_PROJECT_ID !== "your-project-id"
@@ -75,6 +92,11 @@ function getConnectors() {
   return connectors;
 }
 
+// Create storage with localStorage for persistence across page navigations
+const storage = typeof window !== "undefined" 
+  ? createStorage({ storage: window.localStorage })
+  : undefined;
+
 export const wagmiConfig = createConfig({
   chains: [kairosTestnet],
   connectors: getConnectors(),
@@ -82,4 +104,5 @@ export const wagmiConfig = createConfig({
     [kairosTestnet.id]: http(),
   },
   ssr: true,
+  storage,
 });

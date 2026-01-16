@@ -14,7 +14,7 @@ import { maxUint256 } from 'viem';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { RPC_URL } from '@/config/env';
 import { getRouterRoute } from '@/hooks/useSwapQuote';
-import { addStatusMessage } from '@/hooks/useSwapStatus';
+import { addStatusMessage } from '@/contexts/SwapStatusContext';
 
 export interface SwapExecutionState {
   needsApproval: boolean;

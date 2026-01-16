@@ -1,4 +1,3 @@
-'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { ToastContainer, cssTransition } from 'react-toastify';
@@ -28,7 +27,6 @@ function CustomCloseButton({ closeToast }: { closeToast: () => void }) {
 const toastTransition = cssTransition({
   enter: 'toast-enter',
   exit: 'toast-exit',
-  duration: [400, 200], // Faster exit for smoother feel
   appendPosition: false,
   collapse: true, // Enable collapse so other toasts smoothly move up
   collapseDuration: 300, // Smooth collapse animation matching CSS transition
@@ -129,7 +127,6 @@ export function ToastThemedContainer({ containerId }: ToastThemedContainerProps)
           containerId={containerId}
           className="toast-container"
           toastClassName={(context) => getToastTypeClass(context?.type)}
-          bodyClassName="toast-body"
         />
       </div>
     </div>

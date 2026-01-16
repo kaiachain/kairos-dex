@@ -227,30 +227,6 @@ export async function retryWithBackoff<T>(
   throw lastError;
 }
 
-/**
- * Get fresh quote immediately before transaction execution
- * Note: This function is deprecated - use the router's getRouterRoute instead
- * Kept for backward compatibility but will return null
- * 
- * @deprecated Use getRouterRoute from useSwapQuote hook instead
- */
-export async function getFreshQuote(
-  tokenIn: Token,
-  tokenOut: Token,
-  amountIn: string,
-  fee: number,
-  poolAddress: string,
-  maxRetries: number = 3
-): Promise<{
-  amountOut: bigint;
-  sqrtPriceX96After: bigint;
-  initializedTicksCrossed: number;
-  gasEstimate: bigint;
-} | null> {
-  // This function is deprecated - quotes should be obtained from the router
-  console.warn('getFreshQuote is deprecated - use getRouterRoute from useSwapQuote hook instead');
-  return null;
-}
 
 /**
  * Calculate suggested slippage based on price impact

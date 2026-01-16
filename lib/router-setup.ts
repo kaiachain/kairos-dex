@@ -5,45 +5,46 @@
 
 import { Token, CurrencyAmount, ChainId } from '@uniswap/sdk-core';
 import { Provider } from '@ethersproject/providers';
-import state from '../state.json';
+import JSBI from 'jsbi';
+import { ethers } from 'ethers';
+import { CONTRACT_V3_CORE_FACTORY, CONTRACT_QUOTER_V2 } from '@/config/env';
 
-// Backward compatibility: TokenAmount -> CurrencyAmount
 export function TokenAmount(token: Token, rawAmount: string | bigint) {
   return CurrencyAmount.fromRawAmount(token, rawAmount.toString());
-}
-
-// Add 'raw' property for backward compatibility
-if (!CurrencyAmount.prototype.raw) {
-  Object.defineProperty(CurrencyAmount.prototype, 'raw', {
-    get: function() { return this.quotient },
-    enumerable: true,
-    configurable: true
-  });
 }
 
 /**
  * Setup router patches for KAIA chain
  * Following execute-swap-sdk.js setupRouterPatches function
  */
-export function setupRouterPatches(
+export async function setupRouterPatches(
   chainId: number,
   WKAIA_TOKEN: Token,
   USDT_TOKEN: Token
 ) {
   try {
-    const chainsUtil = require('@uniswap/smart-order-router/build/main/util/chains');
-    const addressesUtil = require('@uniswap/smart-order-router/build/main/util/addresses');
-    const configUtil = require('@uniswap/smart-order-router/build/main/routers/alpha-router/config');
-    const gasModelUtil = require('@uniswap/smart-order-router/build/main/routers/alpha-router/gas-models/gas-model');
+    const chainsUtilModule = await import('@uniswap/smart-order-router/build/main/util/chains');
+    const addressesUtilModule = await import('@uniswap/smart-order-router/build/main/util/addresses');
+    const configUtilModule = await import('@uniswap/smart-order-router/build/main/routers/alpha-router/config');
+    const gasModelUtilModule = await import('@uniswap/smart-order-router/build/main/routers/alpha-router/gas-models/gas-model');
+    
+    // Handle both default and named exports
+    const chainsUtil = chainsUtilModule.default || chainsUtilModule;
+    const addressesUtil = addressesUtilModule.default || addressesUtilModule;
+    const configUtil = configUtilModule.default || configUtilModule;
+    const gasModelUtil = gasModelUtilModule.default || gasModelUtilModule;
     
     // Patch chain ID mapping
     const originalIDToChainId = chainsUtil.ID_TO_CHAIN_ID;
     const originalIDToNetworkName = chainsUtil.ID_TO_NETWORK_NAME;
+    // @ts-ignore - These are readonly properties that need to be patched for Kaia chain
     chainsUtil.ID_TO_CHAIN_ID = (id: number) => id === 1001 ? ChainId.MAINNET : originalIDToChainId(id);
+    // @ts-ignore
     chainsUtil.ID_TO_NETWORK_NAME = (id: number) => id === 1001 ? 'mainnet' : originalIDToNetworkName(id);
     
     // Patch routing config - optimize for speed
     const originalDefaultRoutingConfig = configUtil.DEFAULT_ROUTING_CONFIG_BY_CHAIN;
+    // @ts-ignore
     configUtil.DEFAULT_ROUTING_CONFIG_BY_CHAIN = (chainId: number) => {
       const config = originalDefaultRoutingConfig(chainId === 1001 ? ChainId.MAINNET : chainId);
       if (config) {
@@ -59,23 +60,34 @@ export function setupRouterPatches(
     };
     
     // Patch factory and quoter addresses
-    const factoryAddress = state.v3CoreFactoryAddress;
-    const quoterV2Address = state.quoterV2Address;
+    const factoryAddress = CONTRACT_V3_CORE_FACTORY;
+    const quoterV2Address = CONTRACT_QUOTER_V2;
+    // @ts-ignore - These are readonly properties that need to be patched for Kaia chain
     if (!addressesUtil.V3_CORE_FACTORY_ADDRESSES) addressesUtil.V3_CORE_FACTORY_ADDRESSES = {};
+    // @ts-ignore
     if (!addressesUtil.QUOTER_V2_ADDRESSES) addressesUtil.QUOTER_V2_ADDRESSES = {};
+    // @ts-ignore
     if (!addressesUtil.NEW_QUOTER_V2_ADDRESSES) addressesUtil.NEW_QUOTER_V2_ADDRESSES = {};
     
+    // @ts-ignore
     addressesUtil.V3_CORE_FACTORY_ADDRESSES[ChainId.MAINNET] = factoryAddress;
+    // @ts-ignore
     addressesUtil.QUOTER_V2_ADDRESSES[ChainId.MAINNET] = quoterV2Address;
+    // @ts-ignore
     addressesUtil.NEW_QUOTER_V2_ADDRESSES[ChainId.MAINNET] = quoterV2Address;
     
     // Patch wrapped native currency
+    // @ts-ignore
     if (!chainsUtil.WRAPPED_NATIVE_CURRENCY) chainsUtil.WRAPPED_NATIVE_CURRENCY = {};
+    // @ts-ignore
     chainsUtil.WRAPPED_NATIVE_CURRENCY[chainId] = WKAIA_TOKEN;
+    // @ts-ignore
     chainsUtil.WRAPPED_NATIVE_CURRENCY[ChainId.MAINNET] = WKAIA_TOKEN;
     
     // Patch USD gas tokens
+    // @ts-ignore
     if (!gasModelUtil.usdGasTokensByChain) gasModelUtil.usdGasTokensByChain = {};
+    // @ts-ignore
     gasModelUtil.usdGasTokensByChain[chainId] = [USDT_TOKEN];
     if (!gasModelUtil.usdGasTokensByChain[ChainId.MAINNET]) {
       gasModelUtil.usdGasTokensByChain[ChainId.MAINNET] = [];
@@ -95,7 +107,7 @@ export function setupRouterPatches(
  */
 export function patchTokenEquals() {
   try {
-    const TokenClass = require('@uniswap/sdk-core').Token;
+    const TokenClass = Token;
     const originalTokenEquals = TokenClass.prototype.equals;
     TokenClass.prototype.equals = function(other: any) {
       if (!other || !this || !other.chainId || !this.chainId) return false;
@@ -120,7 +132,7 @@ export function patchTokenEquals() {
  */
 export function patchCurrencyAmount() {
   try {
-    const TokenAmountClass = require('@uniswap/sdk-core').CurrencyAmount;
+    const TokenAmountClass = CurrencyAmount;
     
     // Patch subtract
     const originalSubtract = TokenAmountClass.prototype.subtract;
@@ -128,9 +140,11 @@ export function patchCurrencyAmount() {
       if (!this?.currency || !other?.currency) {
         const fallbackCurrency = this?.currency || other?.currency;
         if (!fallbackCurrency) return this;
+        // @ts-ignore - CurrencyAmount constructor is protected, but we need to create instances
         return new TokenAmountClass(fallbackCurrency, '0');
       }
       if (!this.currency.equals(other.currency)) {
+        // @ts-ignore - CurrencyAmount constructor is protected, but we need to create instances
         return new TokenAmountClass(this.currency, '0');
       }
       return originalSubtract.call(this, other);
@@ -159,16 +173,16 @@ export function patchCurrencyAmount() {
  * Create custom multicall provider
  * Following execute-swap-sdk.js createMulticallProvider function
  */
-export function createMulticallProvider(
+export async function createMulticallProvider(
   chainId: number,
   provider: Provider,
   multicallAddress: string
 ) {
   try {
-    const { UniswapInterfaceMulticall__factory } = require('@uniswap/smart-order-router/build/main/types/v3/factories/UniswapInterfaceMulticall__factory');
-    const IMulticallProvider = require('@uniswap/smart-order-router/build/main/providers/multicall-provider').IMulticallProvider;
-    const lodash = require('lodash');
-    const { ethers } = require('ethers');
+    const multicallFactoryModule = await import('@uniswap/smart-order-router/build/main/types/v3/factories/UniswapInterfaceMulticall__factory');
+    const UniswapInterfaceMulticall__factory = multicallFactoryModule.UniswapInterfaceMulticall__factory || multicallFactoryModule.default?.UniswapInterfaceMulticall__factory || multicallFactoryModule.default;
+    const multicallProviderModule = await import('@uniswap/smart-order-router/build/main/providers/multicall-provider');
+    const IMulticallProvider = multicallProviderModule.IMulticallProvider || multicallProviderModule.default?.IMulticallProvider || multicallProviderModule.default;
     
     class CustomMulticallProvider extends IMulticallProvider {
       public chainId: number;
@@ -188,7 +202,7 @@ export function createMulticallProvider(
         const { addresses, contractInterface, functionName, functionParams, providerConfig } = params;
         const fragment = contractInterface.getFunction(functionName);
         const callData = contractInterface.encodeFunctionData(fragment, functionParams);
-        const calls = lodash.map(addresses, (address: string) => ({
+        const calls = addresses.map((address: string) => ({
           target: address,
           callData,
           gasLimit: this.gasLimitPerCall,
@@ -209,7 +223,7 @@ export function createMulticallProvider(
         const { address, contractInterface, functionName, functionParams, additionalConfig, providerConfig } = params;
         const fragment = contractInterface.getFunction(functionName);
         const gasLimitPerCall = additionalConfig?.gasLimitPerCallOverride || this.gasLimitPerCall;
-        const calls = lodash.map(functionParams, (functionParam: any) => ({
+        const calls = functionParams.map((functionParam: any) => ({
           target: address,
           callData: contractInterface.encodeFunctionData(fragment, functionParam),
           gasLimit: gasLimitPerCall,
@@ -234,7 +248,7 @@ export function createMulticallProvider(
       async callMultipleFunctionsOnSameContract(params: any) {
         const { address, contractInterface, functionNames, functionParams, additionalConfig } = params;
         const gasLimitPerCall = additionalConfig?.gasLimitPerCallOverride || this.gasLimitPerCall;
-        const calls = lodash.map(functionNames, (functionName: string, i: number) => ({
+        const calls = functionNames.map((functionName: string, i: number) => ({
           target: address,
           callData: contractInterface.encodeFunctionData(contractInterface.getFunction(functionName), functionParams?.[i] || []),
           gasLimit: gasLimitPerCall,
@@ -262,16 +276,17 @@ export function createMulticallProvider(
  * Following execute-swap-sdk.js fromReadableAmount function
  */
 export function fromReadableAmount(amount: number, decimals: number): bigint {
-  const JSBI = require('jsbi');
   const extraDigits = Math.pow(10, countDecimals(amount));
   const adjustedAmount = amount * extraDigits;
-  return JSBI.toNumber(JSBI.divide(
+  const result = JSBI.divide(
     JSBI.multiply(
       JSBI.BigInt(Math.floor(adjustedAmount)),
       JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(decimals))
     ),
     JSBI.BigInt(extraDigits)
-  ));
+  );
+  return BigInt(JSBI.toNumber(result));
+  return BigInt(JSBI.toNumber(result));
 }
 
 function countDecimals(n: number): number {
