@@ -357,9 +357,6 @@ export const GET_POSITION_BY_TICKS_QUERY = `
   }
 `;
 
-// Legacy exports for backward compatibility (now use position events)
-export const GET_POSITIONS_QUERY = GET_POSITION_EVENTS_QUERY;
-export const GET_POSITION_BY_ID_QUERY = GET_POSITION_BY_TICKS_QUERY;
 
 // Query: Get protocol statistics with factory
 // Note: Factory ID should be the factory contract address (Bytes format)

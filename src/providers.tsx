@@ -79,7 +79,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Component to set up global handler for backward compatibility
+// Component to set up global handler
 function SwapStatusHandler() {
   const { addMessage } = useSwapStatus();
   

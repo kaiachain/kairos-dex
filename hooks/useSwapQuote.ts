@@ -15,7 +15,7 @@ import { RPC_URL } from "@/config/env";
 import { getRouterInstance } from "@/lib/router-instance";
 import { fromReadableAmount, TokenAmount } from "@/lib/router-setup";
 import { formatUnits, parseUnits } from "@/lib/utils";
-import { addStatusMessage } from "@/hooks/useSwapStatus";
+import { addStatusMessage } from "@/contexts/SwapStatusContext";
 import { CONTRACTS } from "@/config/contracts";
 import { QuoterV2_ABI } from "@/abis/QuoterV2";
 import { getPoolAddress, getPoolInfo } from "@/lib/sdk-utils";

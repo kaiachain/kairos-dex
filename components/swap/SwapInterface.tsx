@@ -10,7 +10,7 @@ import { TerminalStatus } from './TerminalStatus';
 import { ArrowDownUp, Loader2 } from 'lucide-react';
 import { useSwapQuote } from '@/hooks/useSwapQuote';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
-import { useSwapStatus } from '@/hooks/useSwapStatus';
+import { useSwapStatus } from '@/contexts/SwapStatusContext';
 import { useSwapForm } from '@/hooks/useSwapForm';
 import { useSwapConfirmation } from '@/hooks/useSwapConfirmation';
 import { formatBalance } from '@/lib/utils';

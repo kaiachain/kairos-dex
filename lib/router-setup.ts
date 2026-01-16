@@ -9,18 +9,8 @@ import JSBI from 'jsbi';
 import { ethers } from 'ethers';
 import { CONTRACT_V3_CORE_FACTORY, CONTRACT_QUOTER_V2 } from '@/config/env';
 
-// Backward compatibility: TokenAmount -> CurrencyAmount
 export function TokenAmount(token: Token, rawAmount: string | bigint) {
   return CurrencyAmount.fromRawAmount(token, rawAmount.toString());
-}
-
-// Add 'raw' property for backward compatibility
-if (!(CurrencyAmount.prototype as any).raw) {
-  Object.defineProperty(CurrencyAmount.prototype, 'raw', {
-    get: function() { return this.quotient },
-    enumerable: true,
-    configurable: true
-  });
 }
 
 /**

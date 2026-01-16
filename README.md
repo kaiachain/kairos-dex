@@ -189,9 +189,9 @@ npm run preview
 │   ├── App.tsx            # Root component with routing
 │   ├── main.tsx           # Application entry point
 │   └── globals.css        # Global styles and CSS variables
-├── components/            # Legacy components (being migrated to features/)
-├── hooks/                # Legacy hooks (being migrated to features/)
-├── types/                # Legacy types (being migrated to features/)
+├── components/            # UI components
+├── hooks/                # React hooks
+├── types/                # TypeScript type definitions
 ├── config/               # Configuration files
 │   ├── env.ts            # Environment variable configuration
 │   ├── wagmi.ts          # Wagmi configuration
@@ -211,8 +211,8 @@ npm run preview
 │   ├── QuoterV2.ts
 │   ├── SwapRouter02.ts
 │   └── WKAIA.ts
-├── services/             # Service layer (legacy, being migrated)
-├── contexts/             # React contexts (legacy, being migrated)
+├── services/             # Service layer
+├── contexts/             # React contexts
 ├── public/               # Static assets
 ├── dist/                 # Build output (generated)
 ├── vite.config.ts        # Vite configuration

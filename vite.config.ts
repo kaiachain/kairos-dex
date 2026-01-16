@@ -14,6 +14,8 @@ export default defineConfig({
         global: true,
         process: true,
       },
+      // Include polyfills for CommonJS support
+      protocolImports: true,
       // Exclude modules that don't need polyfills
       exclude: ['fs', 'net', 'tls'],
     }),
@@ -26,7 +28,6 @@ export default defineConfig({
       { find: '@/app', replacement: path.resolve(__dirname, './src/app') },
       // General alias for root (must come last)
       { find: '@', replacement: path.resolve(__dirname, './') },
-      // Legacy aliases for backward compatibility
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/config', replacement: path.resolve(__dirname, './config') },
       { find: '@/abis', replacement: path.resolve(__dirname, './abis') },
@@ -43,7 +44,6 @@ export default defineConfig({
   },
   define: {
     // Note: Vite uses import.meta.env, not process.env
-    // We keep this empty object for compatibility with libraries that expect process.env
     'process.env': {},
     global: 'globalThis',
     'Browser': 'undefined',
@@ -52,11 +52,12 @@ export default defineConfig({
     include: [
       '@uniswap/v3-sdk',
       '@uniswap/sdk-core',
+      // Include router to pre-bundle and convert CommonJS to ESM
+      '@uniswap/smart-order-router',
+      '@uniswap/smart-order-router/build/main',
     ],
     exclude: [
       'brotli',
-      // Exclude large dependencies that are dynamically imported
-      '@uniswap/smart-order-router',
     ],
     esbuildOptions: {
       define: {
@@ -65,6 +66,8 @@ export default defineConfig({
       // Enable tree-shaking in optimizeDeps
       treeShaking: true,
     },
+    // Force re-optimization if needed
+    force: false,
   },
   build: {
     // Use esbuild for faster builds (default, faster than terser)

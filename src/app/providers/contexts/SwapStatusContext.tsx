@@ -55,7 +55,6 @@ export function useSwapStatus() {
 }
 
 // Global function to add status messages (for use outside React components)
-// This will be deprecated in favor of using the hook, but kept for backward compatibility
 let globalAddMessage: ((type: StatusMessage['type'], message: string, details?: string) => void) | null = null;
 
 export function setGlobalSwapStatusHandler(handler: (type: StatusMessage['type'], message: string, details?: string) => void) {

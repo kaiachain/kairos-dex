@@ -123,7 +123,6 @@ export interface SubgraphSwap {
   amountUSD: string;
 }
 
-// Legacy interface for backward compatibility
 export interface SubgraphPosition {
   id: string;
   owner: string;
@@ -196,7 +195,6 @@ export interface SubgraphPositionByTicksResponse {
   collects: SubgraphCollect[];
 }
 
-// Legacy interfaces for backward compatibility
 export interface SubgraphPositionsResponse {
   positions: SubgraphPosition[];
 }
