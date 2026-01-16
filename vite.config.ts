@@ -53,85 +53,155 @@ export default defineConfig({
       '@uniswap/v3-sdk',
       '@uniswap/sdk-core',
     ],
-    exclude: ['brotli'],
+    exclude: [
+      'brotli',
+      // Exclude large dependencies that are dynamically imported
+      '@uniswap/smart-order-router',
+    ],
     esbuildOptions: {
       define: {
         global: 'globalThis',
       },
+      // Enable tree-shaking in optimizeDeps
+      treeShaking: true,
     },
   },
   build: {
-    commonjsOptions: {
-      include: [/node_modules/, /@uniswap\/smart-order-router/],
-      transformMixedEsModules: true,
-      strictRequires: true,
-    },
+    // Use esbuild for faster builds (default, faster than terser)
+    // For better minification, can switch to 'terser' but requires terser package
+    minify: 'esbuild',
+    // Aggressive minification options
+    target: 'es2015', // Target modern browsers for smaller bundles
+    // Disable sourcemaps for production to reduce bundle size
+    sourcemap: false,
+    // Report compressed size (can disable to speed up builds)
+    reportCompressedSize: true,
+    // Aggressive tree-shaking
     rollupOptions: {
+      treeshake: {
+        moduleSideEffects: false,
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false,
+      },
       output: {
         manualChunks: (id) => {
-          // Don't split feature code - keep it in main bundle to avoid circular deps
-          // Features will be code-split via dynamic imports instead
+          // Only chunk node_modules, skip source files
+          if (!id.includes('node_modules')) {
+            return;
+          }
           
           // React and core libraries (must come first to avoid circular deps)
           if (
-            id.includes('node_modules/react') ||
-            id.includes('node_modules/react-dom') ||
-            id.includes('node_modules/react-router') ||
-            id.includes('node_modules/scheduler')
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/react-router/') ||
+            id.includes('node_modules/scheduler/')
           ) {
             return 'react-vendor';
           }
           
           // React Query (depends on React)
-          if (id.includes('node_modules/@tanstack/react-query')) {
+          if (id.includes('node_modules/@tanstack/react-query/')) {
             return 'react-query-vendor';
           }
           
-          // Wagmi and viem (depends on React Query)
-          if (id.includes('node_modules/wagmi')) {
+          // Wagmi (depends on React Query) - check before viem to avoid cycles
+          if (id.includes('node_modules/wagmi/') && !id.includes('node_modules/wagmi/node_modules')) {
             return 'wagmi-vendor';
           }
-          if (id.includes('node_modules/viem')) {
+          
+          // Viem (separate from wagmi to avoid circular deps)
+          if (id.includes('node_modules/viem/') && !id.includes('node_modules/viem/node_modules')) {
             return 'viem-vendor';
           }
           
+          // Wallet libraries (large, can be lazy-loaded)
+          if (
+            id.includes('node_modules/@coinbase/') ||
+            id.includes('node_modules/@walletconnect/') ||
+            id.includes('node_modules/@web3modal/')
+          ) {
+            return 'wallet-vendor';
+          }
+          
+          // Wagmi connectors and core (separate from main wagmi)
+          if (
+            id.includes('node_modules/@wagmi/core/') ||
+            id.includes('node_modules/@wagmi/connectors/')
+          ) {
+            return 'wagmi-connectors-vendor';
+          }
+          
           // Uniswap SDK (large, standalone)
-          if (id.includes('node_modules/@uniswap')) {
+          if (id.includes('node_modules/@uniswap/')) {
             return 'uniswap-vendor';
           }
           
           // Ethers (used by router, large)
-          if (id.includes('node_modules/@ethersproject') || id.includes('node_modules/ethers')) {
+          if (
+            id.includes('node_modules/@ethersproject/') ||
+            (id.includes('node_modules/ethers/') && !id.includes('node_modules/ethers/node_modules'))
+          ) {
             return 'ethers-vendor';
           }
           
           // GraphQL (standalone)
-          if (id.includes('node_modules/graphql') || id.includes('node_modules/graphql-request')) {
+          if (
+            id.includes('node_modules/graphql/') ||
+            id.includes('node_modules/graphql-request/')
+          ) {
             return 'graphql-vendor';
+          }
+          
+          // Crypto/encoding libraries
+          if (
+            id.includes('node_modules/jsbi/') ||
+            id.includes('node_modules/base64-') ||
+            id.includes('node_modules/@noble/')
+          ) {
+            return 'crypto-vendor';
+          }
+          
+          // Node polyfills (vm-browserify, buffer, stream, util)
+          if (
+            id.includes('node_modules/vm-browserify/') ||
+            id.includes('node_modules/buffer/') ||
+            id.includes('node_modules/stream-') ||
+            id.includes('node_modules/util/') ||
+            id.includes('node_modules/process/')
+          ) {
+            return 'polyfills-vendor';
           }
           
           // UI libraries
           if (
-            id.includes('node_modules/lucide-react') ||
-            id.includes('node_modules/react-toastify') ||
-            id.includes('node_modules/recharts')
+            id.includes('node_modules/lucide-react/') ||
+            id.includes('node_modules/react-toastify/') ||
+            id.includes('node_modules/recharts/')
           ) {
             return 'ui-vendor';
           }
           
-          // Utility libraries
+          // Utility libraries (small, commonly used)
           if (
-            id.includes('node_modules/clsx') ||
-            id.includes('node_modules/tailwind-merge') ||
-            id.includes('node_modules/zustand')
+            id.includes('node_modules/clsx/') ||
+            id.includes('node_modules/tailwind-merge/') ||
+            id.includes('node_modules/zustand/')
           ) {
             return 'utils-vendor';
           }
           
-          // Other vendor libraries (catch-all, but smaller now)
-          if (id.includes('node_modules')) {
-            return 'vendor';
+          // Shared/common dependencies that might cause circular deps
+          // Put these in a separate chunk to break cycles
+          if (
+            id.includes('node_modules/ox/') ||
+            id.includes('node_modules/abitype/')
+          ) {
+            return 'shared-vendor';
           }
+          
+          // Other vendor libraries (catch-all, but smaller now)
+          return 'vendor';
         },
       },
     },
