@@ -66,7 +66,9 @@ async function getFastQuoteFromQuoter(
     // Try each fee tier - stop on first success
     for (const fee of feeTiers) {
       try {
-        const poolAddress = await getPoolAddress(tokenIn, tokenOut, fee);
+        const sdkTokenIn = tokenToSDKToken(tokenIn);
+        const sdkTokenOut = tokenToSDKToken(tokenOut);
+        const poolAddress = await getPoolAddress(sdkTokenIn, sdkTokenOut, fee);
         if (!poolAddress) continue;
         
         console.log(`Trying QuoterV2 for pool ${poolAddress} with fee ${fee}...`);
@@ -837,7 +839,9 @@ export function useSwapQuote(
             // Quick check: try most common fee tiers first
             const commonFees = [100, FeeAmount.LOW, FeeAmount.MEDIUM, FeeAmount.HIGH];
             for (const fee of commonFees) {
-              const poolAddr = await getPoolAddress(tokenIn, tokenOut, fee);
+              const sdkTokenIn = tokenToSDKToken(tokenIn);
+              const sdkTokenOut = tokenToSDKToken(tokenOut);
+              const poolAddr = await getPoolAddress(sdkTokenIn, sdkTokenOut, fee);
               if (poolAddr) {
                 hasDirectPool = true;
                 console.log(`Direct pool found at fee ${fee}, will try QuoterV2 first`);

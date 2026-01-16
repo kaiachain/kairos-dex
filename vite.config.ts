@@ -69,46 +69,73 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // React and core libraries
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
+          // Don't split feature code - keep it in main bundle to avoid circular deps
+          // Features will be code-split via dynamic imports instead
+          
+          // React and core libraries (must come first to avoid circular deps)
+          if (
+            id.includes('node_modules/react') ||
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/react-router') ||
+            id.includes('node_modules/scheduler')
+          ) {
             return 'react-vendor';
           }
-          // Wagmi and viem
-          if (id.includes('node_modules/wagmi') || id.includes('node_modules/viem')) {
+          
+          // React Query (depends on React)
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'react-query-vendor';
+          }
+          
+          // Wagmi and viem (depends on React Query)
+          if (id.includes('node_modules/wagmi')) {
             return 'wagmi-vendor';
           }
-          // Uniswap SDK
+          if (id.includes('node_modules/viem')) {
+            return 'viem-vendor';
+          }
+          
+          // Uniswap SDK (large, standalone)
           if (id.includes('node_modules/@uniswap')) {
             return 'uniswap-vendor';
           }
-          // Ethers (used by router)
+          
+          // Ethers (used by router, large)
           if (id.includes('node_modules/@ethersproject') || id.includes('node_modules/ethers')) {
             return 'ethers-vendor';
           }
-          // GraphQL
+          
+          // GraphQL (standalone)
           if (id.includes('node_modules/graphql') || id.includes('node_modules/graphql-request')) {
             return 'graphql-vendor';
           }
-          // Feature-based code splitting
-          if (id.includes('/src/features/swap/')) {
-            return 'swap-feature';
+          
+          // UI libraries
+          if (
+            id.includes('node_modules/lucide-react') ||
+            id.includes('node_modules/react-toastify') ||
+            id.includes('node_modules/recharts')
+          ) {
+            return 'ui-vendor';
           }
-          if (id.includes('/src/features/pools/')) {
-            return 'pools-feature';
+          
+          // Utility libraries
+          if (
+            id.includes('node_modules/clsx') ||
+            id.includes('node_modules/tailwind-merge') ||
+            id.includes('node_modules/zustand')
+          ) {
+            return 'utils-vendor';
           }
-          if (id.includes('/src/features/positions/')) {
-            return 'positions-feature';
-          }
-          if (id.includes('/src/features/liquidity/')) {
-            return 'liquidity-feature';
-          }
-          // Other vendor libraries
+          
+          // Other vendor libraries (catch-all, but smaller now)
           if (id.includes('node_modules')) {
             return 'vendor';
           }
         },
       },
     },
+    chunkSizeWarningLimit: 1000, // Increase limit to 1MB to reduce noise
   },
   server: {
     port: 3000,

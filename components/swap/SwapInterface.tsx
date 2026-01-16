@@ -208,7 +208,7 @@ export function SwapInterface() {
         </div>
 
         {/* Price Info */}
-        {showPriceInfo && (
+        {showPriceInfo && quote && tokenIn && tokenOut && (
           <PriceInfo
             quote={quote}
             tokenIn={tokenIn}
