@@ -47,11 +47,14 @@ export async function setupRouterPatches(
     // Patch chain ID mapping
     const originalIDToChainId = chainsUtil.ID_TO_CHAIN_ID;
     const originalIDToNetworkName = chainsUtil.ID_TO_NETWORK_NAME;
+    // @ts-ignore - These are readonly properties that need to be patched for Kaia chain
     chainsUtil.ID_TO_CHAIN_ID = (id: number) => id === 1001 ? ChainId.MAINNET : originalIDToChainId(id);
+    // @ts-ignore
     chainsUtil.ID_TO_NETWORK_NAME = (id: number) => id === 1001 ? 'mainnet' : originalIDToNetworkName(id);
     
     // Patch routing config - optimize for speed
     const originalDefaultRoutingConfig = configUtil.DEFAULT_ROUTING_CONFIG_BY_CHAIN;
+    // @ts-ignore
     configUtil.DEFAULT_ROUTING_CONFIG_BY_CHAIN = (chainId: number) => {
       const config = originalDefaultRoutingConfig(chainId === 1001 ? ChainId.MAINNET : chainId);
       if (config) {
@@ -69,21 +72,32 @@ export async function setupRouterPatches(
     // Patch factory and quoter addresses
     const factoryAddress = state.v3CoreFactoryAddress;
     const quoterV2Address = state.quoterV2Address;
+    // @ts-ignore - These are readonly properties that need to be patched for Kaia chain
     if (!addressesUtil.V3_CORE_FACTORY_ADDRESSES) addressesUtil.V3_CORE_FACTORY_ADDRESSES = {};
+    // @ts-ignore
     if (!addressesUtil.QUOTER_V2_ADDRESSES) addressesUtil.QUOTER_V2_ADDRESSES = {};
+    // @ts-ignore
     if (!addressesUtil.NEW_QUOTER_V2_ADDRESSES) addressesUtil.NEW_QUOTER_V2_ADDRESSES = {};
     
+    // @ts-ignore
     addressesUtil.V3_CORE_FACTORY_ADDRESSES[ChainId.MAINNET] = factoryAddress;
+    // @ts-ignore
     addressesUtil.QUOTER_V2_ADDRESSES[ChainId.MAINNET] = quoterV2Address;
+    // @ts-ignore
     addressesUtil.NEW_QUOTER_V2_ADDRESSES[ChainId.MAINNET] = quoterV2Address;
     
     // Patch wrapped native currency
+    // @ts-ignore
     if (!chainsUtil.WRAPPED_NATIVE_CURRENCY) chainsUtil.WRAPPED_NATIVE_CURRENCY = {};
+    // @ts-ignore
     chainsUtil.WRAPPED_NATIVE_CURRENCY[chainId] = WKAIA_TOKEN;
+    // @ts-ignore
     chainsUtil.WRAPPED_NATIVE_CURRENCY[ChainId.MAINNET] = WKAIA_TOKEN;
     
     // Patch USD gas tokens
+    // @ts-ignore
     if (!gasModelUtil.usdGasTokensByChain) gasModelUtil.usdGasTokensByChain = {};
+    // @ts-ignore
     gasModelUtil.usdGasTokensByChain[chainId] = [USDT_TOKEN];
     if (!gasModelUtil.usdGasTokensByChain[ChainId.MAINNET]) {
       gasModelUtil.usdGasTokensByChain[ChainId.MAINNET] = [];
@@ -136,9 +150,11 @@ export function patchCurrencyAmount() {
       if (!this?.currency || !other?.currency) {
         const fallbackCurrency = this?.currency || other?.currency;
         if (!fallbackCurrency) return this;
+        // @ts-ignore - CurrencyAmount constructor is protected, but we need to create instances
         return new TokenAmountClass(fallbackCurrency, '0');
       }
       if (!this.currency.equals(other.currency)) {
+        // @ts-ignore - CurrencyAmount constructor is protected, but we need to create instances
         return new TokenAmountClass(this.currency, '0');
       }
       return originalSubtract.call(this, other);
@@ -272,13 +288,15 @@ export async function createMulticallProvider(
 export function fromReadableAmount(amount: number, decimals: number): bigint {
   const extraDigits = Math.pow(10, countDecimals(amount));
   const adjustedAmount = amount * extraDigits;
-  return JSBI.toNumber(JSBI.divide(
+  const result = JSBI.divide(
     JSBI.multiply(
       JSBI.BigInt(Math.floor(adjustedAmount)),
       JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(decimals))
     ),
     JSBI.BigInt(extraDigits)
-  ));
+  );
+  return BigInt(JSBI.toNumber(result));
+  return BigInt(JSBI.toNumber(result));
 }
 
 function countDecimals(n: number): number {

@@ -192,7 +192,7 @@ async function patchGetCandidatePools() {
     
     for (const getCandidatePoolsPath of candidatePaths) {
       try {
-        const getCandidatePoolsModule = await import(getCandidatePoolsPath);
+        const getCandidatePoolsModule = await import(/* @vite-ignore */ getCandidatePoolsPath);
         if (getCandidatePoolsModule) {
           const originalGetCandidatePools = getCandidatePoolsModule.getCandidatePools || getCandidatePoolsModule.default || (getCandidatePoolsModule.default && getCandidatePoolsModule.default.default ? getCandidatePoolsModule.default.default : null);
           if (originalGetCandidatePools && typeof originalGetCandidatePools === 'function') {

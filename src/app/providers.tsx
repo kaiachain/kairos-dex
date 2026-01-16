@@ -1,13 +1,13 @@
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { wagmiConfig } from '@/config/wagmi';
-import { ThemeProvider } from '@/app/providers/contexts/ThemeContext';
-import { SwapStatusProvider } from '@/app/providers/contexts/SwapStatusContext';
+import { ThemeProvider } from './providers/contexts/ThemeContext';
+import { SwapStatusProvider } from './providers/contexts/SwapStatusContext';
 import { ToastThemedContainer } from '@/shared/components/ToastThemedContainer';
 import { WalletConnectionMonitor } from '@/features/wallet/components/WalletConnectionMonitor';
 import { useState, useEffect } from 'react';
-import { setGlobalSwapStatusHandler } from '@/app/providers/contexts/SwapStatusContext';
-import { useSwapStatus } from '@/app/providers/contexts/SwapStatusContext';
+import { setGlobalSwapStatusHandler } from './providers/contexts/SwapStatusContext';
+import { useSwapStatus } from './providers/contexts/SwapStatusContext';
 
 // Query key factories for consistent caching
 export const queryKeys = {
