@@ -319,19 +319,28 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
     return routerInstance;
   }
 
-  // Prevent concurrent initialization
+  // Prevent concurrent initialization - use Promise-based waiting instead of busy-wait
   if (routerInitializing) {
-    let retries = 0;
-    while (routerInitializing && retries < 10) {
-      const start = Date.now();
-      while (Date.now() - start < 100) {
-        // Busy wait
-      }
-      retries++;
-    }
-    if (routerInstance) {
-      return routerInstance;
-    }
+    // Wait for initialization to complete with timeout
+    return new Promise((resolve, reject) => {
+      const maxWaitTime = 10000; // 10 seconds max wait
+      const startTime = Date.now();
+      const checkInterval = 100; // Check every 100ms
+
+      const checkInitialization = setInterval(() => {
+        if (routerInstance && routerInitialized) {
+          clearInterval(checkInitialization);
+          resolve(routerInstance);
+          return;
+        }
+
+        if (Date.now() - startTime > maxWaitTime) {
+          clearInterval(checkInitialization);
+          reject(new Error('Router initialization timeout'));
+          return;
+        }
+      }, checkInterval);
+    });
   }
 
   routerInitializing = true;

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { Pool } from '@/types/pool';
 import { formatCurrency, formatNumber, formatAddress } from '@/lib/utils';
@@ -8,7 +9,7 @@ interface PoolCardProps {
   pool: Pool;
 }
 
-export function PoolCard({ pool }: PoolCardProps) {
+function PoolCardComponent({ pool }: PoolCardProps) {
   return (
     <Link href={`/pools/${pool.address}`}>
       <div className="bg-white dark:bg-card rounded-xl p-6 border border-border hover:shadow-lg transition-shadow cursor-pointer">
@@ -53,3 +54,5 @@ export function PoolCard({ pool }: PoolCardProps) {
   );
 }
 
+// Memoize component to prevent unnecessary re-renders
+export const PoolCard = React.memo(PoolCardComponent);

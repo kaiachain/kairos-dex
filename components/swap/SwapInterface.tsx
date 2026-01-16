@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useAccount } from 'wagmi';
 import { TokenSelector } from './TokenSelector';
 import { SwapButton } from './SwapButton';
 import { SwapSettings } from './SwapSettings';
 import { PriceInfo } from './PriceInfo';
-import { SwapConfirmation } from './SwapConfirmation';
 import { TerminalStatus } from './TerminalStatus';
 import { ArrowDownUp, Loader2 } from 'lucide-react';
 import { useSwapQuote } from '@/hooks/useSwapQuote';
@@ -15,6 +15,14 @@ import { useSwapStatus } from '@/hooks/useSwapStatus';
 import { useSwapForm } from '@/hooks/useSwapForm';
 import { useSwapConfirmation } from '@/hooks/useSwapConfirmation';
 import { formatBalance } from '@/lib/utils';
+
+// Dynamically import SwapConfirmation to reduce initial bundle size
+const SwapConfirmation = dynamic(
+  () => import('./SwapConfirmation').then((mod) => ({ default: mod.SwapConfirmation })),
+  {
+    loading: () => null, // Modal doesn't need loading state
+  }
+);
 
 export function SwapInterface() {
   const { isConnected } = useAccount();
@@ -52,29 +60,47 @@ export function SwapInterface() {
     closeConfirmation,
   } = useSwapConfirmation();
 
-  // Handle reverse with quote amount
-  const handleReverseWithQuote = () => {
+  // Memoize handlers to prevent unnecessary re-renders
+  const handleReverseWithQuote = useCallback(() => {
     handleReverse();
     if (quote?.amountOut) {
       setAmountIn(quote.amountOut);
     }
-  };
+  }, [handleReverse, quote?.amountOut, setAmountIn]);
 
-  // Handle max with balance
-  const handleMaxWithBalance = () => {
+  const handleMaxWithBalance = useCallback(() => {
     if (balanceIn) {
       handleMax(balanceIn);
     }
-  };
+  }, [balanceIn, handleMax]);
 
-  // Handle swap success
-  const onSwapSuccess = (hash: string) => {
+  const onSwapSuccess = useCallback((hash: string) => {
     handleSwapSuccess(hash, tokenIn, tokenOut, amountIn, quote?.amountOut);
     clearMessages();
     setAmountIn('');
     refetchBalanceIn?.();
     refetchBalanceOut?.();
-  };
+  }, [handleSwapSuccess, tokenIn, tokenOut, amountIn, quote?.amountOut, clearMessages, setAmountIn, refetchBalanceIn, refetchBalanceOut]);
+
+  // Memoize formatted balance display
+  const formattedBalanceIn = useMemo(() => {
+    return balanceIn ? formatBalance(balanceIn, 4) : '';
+  }, [balanceIn]);
+
+  // Memoize formatted quote amount
+  const formattedAmountOut = useMemo(() => {
+    return quote?.amountOut ? formatBalance(quote.amountOut, 6) : '';
+  }, [quote?.amountOut]);
+
+  // Memoize condition for showing price info
+  const showPriceInfo = useMemo(() => {
+    return !isQuoteLoading && quote && tokenIn && tokenOut && amountIn && parseFloat(amountIn) > 0;
+  }, [isQuoteLoading, quote, tokenIn, tokenOut, amountIn]);
+
+  // Memoize condition for showing terminal status
+  const showTerminalStatus = useMemo(() => {
+    return isQuoteLoading || statusMessages.length > 0;
+  }, [isQuoteLoading, statusMessages.length]);
 
   // Reset confirmation when form changes
   useEffect(() => {
@@ -107,7 +133,7 @@ export function SwapInterface() {
                 onClick={handleMaxWithBalance}
                 className="text-xs text-primary hover:opacity-80 font-medium transition-colors"
               >
-                Balance: {formatBalance(balanceIn, 4)}
+                Balance: {formattedBalanceIn}
               </button>
             )}
           </div>
@@ -153,7 +179,7 @@ export function SwapInterface() {
               </span>
             ) : quote?.amountOut ? (
               <span className="text-xs text-text-secondary font-medium">
-                ≈ {formatBalance(quote.amountOut, 6)}
+                ≈ {formattedAmountOut}
               </span>
             ) : quoteError ? (
               <span className="text-xs text-error">
@@ -186,7 +212,7 @@ export function SwapInterface() {
         </div>
 
         {/* Price Info */}
-        {!isQuoteLoading && quote && tokenIn && tokenOut && amountIn && parseFloat(amountIn) > 0 && (
+        {showPriceInfo && (
           <PriceInfo
             quote={quote}
             tokenIn={tokenIn}
@@ -211,11 +237,11 @@ export function SwapInterface() {
         />
 
         {/* Terminal Status - Developer View */}
-        {(isQuoteLoading || statusMessages.length > 0) && (
+        {showTerminalStatus && (
           <div className="mt-4">
             <TerminalStatus 
               messages={statusMessages} 
-              isActive={isQuoteLoading || statusMessages.length > 0}
+              isActive={showTerminalStatus}
             />
           </div>
         )}

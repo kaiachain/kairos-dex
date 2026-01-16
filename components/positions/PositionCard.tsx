@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { Position } from "@/types/position";
 import { formatCurrency, formatNumber, formatBalance } from "@/lib/utils";
@@ -12,7 +13,7 @@ interface PositionCardProps {
   collectCount?: number;
 }
 
-export function PositionCard({
+function PositionCardComponent({
   position,
   mintCount = 0,
   burnCount = 0,
@@ -184,3 +185,6 @@ export function PositionCard({
     </Link>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+export const PositionCard = React.memo(PositionCardComponent);

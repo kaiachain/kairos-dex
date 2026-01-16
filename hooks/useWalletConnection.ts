@@ -29,8 +29,8 @@ export interface UseWalletConnectionReturn extends WalletConnectionState {
  * auto-reconnection, and chain validation.
  */
 export function useWalletConnection(): UseWalletConnectionReturn {
-  const { address, isConnected, connector, isReconnecting } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected, connector, isReconnecting, chainId: accountChainId } = useAccount();
+  const hookChainId = useChainId();
   const { connect: wagmiConnect, connectors, isPending: isConnecting, error: connectError } = useConnect();
   const { disconnect: wagmiDisconnect, isPending: isDisconnecting } = useDisconnect();
   const { switchChain: wagmiSwitchChain } = useSwitchChain();
@@ -39,7 +39,12 @@ export function useWalletConnection(): UseWalletConnectionReturn {
   const [error, setError] = useState<Error | null>(null);
   const [lastConnectorId, setLastConnectorId] = useState<string | null>(null);
   const reconnectAttemptedRef = useRef(false);
-  const isCorrectChain = chainId === CHAIN_ID;
+  
+  // Use chainId from account if available (more reliable), otherwise fall back to hook chainId
+  const chainId = accountChainId || hookChainId || 0;
+  
+  // Chain is correct only if connected and chainId matches
+  const isCorrectChain = isConnected && chainId > 0 && chainId === CHAIN_ID;
 
   // Clear error when connection succeeds
   useEffect(() => {
