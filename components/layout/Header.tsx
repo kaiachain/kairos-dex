@@ -49,25 +49,52 @@ function ConnectWalletModal({
   if (!isOpen) return null;
 
   const getConnectorName = (connector: any) => {
-    if (connector.name.toLowerCase().includes("metamask")) return "MetaMask";
-    if (connector.name.toLowerCase().includes("walletconnect")) return "WalletConnect";
-    if (connector.name.toLowerCase().includes("coinbase")) return "Coinbase Wallet";
+    // Check connector id first (more reliable)
+    const connectorId = connector.id?.toLowerCase() || "";
+    if (connectorId.includes("kaia") || connectorId.includes("kaikas") || connectorId.includes("klaytn")) {
+      return "Kaia Wallet";
+    }
+    
+    if (!connector.name) return "Unknown Wallet";
+    const name = connector.name.toLowerCase();
+    if (name.includes("metamask")) return "MetaMask";
+    if (name.includes("walletconnect")) return "WalletConnect";
+    if (name.includes("coinbase")) return "Coinbase Wallet";
+    if (name.includes("kaia") || name.includes("kaikas") || name.includes("klaytn")) return "Kaia Wallet";
     return connector.name;
   };
 
   const getConnectorIcon = (connector: any) => {
+    // Check connector id first (more reliable)
+    const connectorId = connector.id?.toLowerCase() || "";
+    if (connectorId.includes("kaia") || connectorId.includes("kaikas") || connectorId.includes("klaytn")) {
+      return "🟣";
+    }
+    
+    if (!connector.name) return "💼";
     const name = connector.name.toLowerCase();
     if (name.includes("metamask")) return "🦊";
     if (name.includes("walletconnect")) return "🔗";
     if (name.includes("coinbase")) return "🔵";
+    if (name.includes("kaia") || name.includes("kaikas") || name.includes("klaytn")) return "🟣";
     return "💼";
   };
 
-  // Filter out duplicate connectors based on normalized name
-  const uniqueConnectors = connectors.filter((connector, index, self) => {
-    const normalizedName = getConnectorName(connector);
-    return index === self.findIndex((c) => getConnectorName(c) === normalizedName);
-  });
+  // Filter out connectors without names (except Kaia Wallet which we identify by id) and duplicates based on normalized name
+  const uniqueConnectors = connectors
+    .filter((connector) => {
+      // Include connectors with a name, or connectors that might be Kaia Wallet (identified by id)
+      if (connector.name) return true;
+      const connectorId = connector.id?.toLowerCase() || "";
+      if (connectorId.includes("kaia") || connectorId.includes("kaikas") || connectorId.includes("klaytn")) {
+        return true;
+      }
+      return false;
+    })
+    .filter((connector, index, self) => {
+      const normalizedName = getConnectorName(connector);
+      return index === self.findIndex((c) => getConnectorName(c) === normalizedName);
+    });
 
   const handleConnect = async (connector: any) => {
     try {
@@ -122,9 +149,11 @@ function ConnectWalletModal({
                     <div className="text-xs text-text-secondary">
                       {isConnectingThis ? "Connecting..." : (
                         <>
-                          {connector.name.toLowerCase().includes("metamask") && "Connect using MetaMask browser extension"}
-                          {connector.name.toLowerCase().includes("walletconnect") && "Connect using WalletConnect"}
-                          {connector.name.toLowerCase().includes("coinbase") && "Connect using Coinbase Wallet"}
+                          {(connector.name?.toLowerCase().includes("metamask") || connector.id?.toLowerCase().includes("metamask")) && "Connect using MetaMask browser extension"}
+                          {(connector.name?.toLowerCase().includes("walletconnect") || connector.id?.toLowerCase().includes("walletconnect")) && "Connect using WalletConnect"}
+                          {(connector.name?.toLowerCase().includes("coinbase") || connector.id?.toLowerCase().includes("coinbase")) && "Connect using Coinbase Wallet"}
+                          {((connector.name?.toLowerCase().includes("kaia") || connector.name?.toLowerCase().includes("kaikas") || connector.name?.toLowerCase().includes("klaytn")) ||
+                            (connector.id?.toLowerCase().includes("kaia") || connector.id?.toLowerCase().includes("kaikas") || connector.id?.toLowerCase().includes("klaytn"))) && "Connect using Kaia Wallet browser extension"}
                         </>
                       )}
                     </div>
@@ -181,6 +210,17 @@ export function Header() {
   } = useWalletConnection();
   
   const { connectors } = useConnect();
+  
+  // Debug: Log connectors to help identify Kaia Wallet
+  useEffect(() => {
+    if (connectors.length > 0) {
+      console.log("Available connectors:", connectors.map(c => ({ 
+        id: c.id, 
+        name: c.name, 
+        uid: c.uid 
+      })));
+    }
+  }, [connectors]);
   const pathname = usePathname();
   const [showMenu, setShowMenu] = useState(false);
   const [showWalletMenu, setShowWalletMenu] = useState(false);
