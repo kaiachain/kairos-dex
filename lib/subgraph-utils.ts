@@ -148,8 +148,12 @@ export function subgraphPoolToPool(subgraphPool: SubgraphPool): Pool {
   const apr = calculateAPR(fees7d, tvl, 7);
 
   // Calculate current price
-  const currentPrice = subgraphPool.token0Price
-    ? parseFloat(subgraphPool.token0Price)
+  // We need token1/token0 for display as "1 token0 = X token1"
+  // token1Price from subgraph is token1/token0, token0Price is token0/token1
+  const currentPrice = subgraphPool.token1Price
+    ? parseFloat(subgraphPool.token1Price)
+    : subgraphPool.token0Price
+    ? 1 / parseFloat(subgraphPool.token0Price) // Invert token0Price to get token1/token0
     : calculatePriceFromSqrtPriceX96(
         subgraphPool.sqrtPrice,
         token0.decimals,

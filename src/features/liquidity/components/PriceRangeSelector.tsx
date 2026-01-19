@@ -1,5 +1,7 @@
 
 import { Token } from '@/types/token';
+import { calculatePriceFromTick } from '@/lib/subgraph-utils';
+import { useMemo } from 'react';
 
 interface PriceRangeSelectorProps {
   token0: Token | null;
@@ -24,6 +26,37 @@ export function PriceRangeSelector({
   currentTick,
   isFirstLiquidity = false,
 }: PriceRangeSelectorProps) {
+  // Calculate current price from tick
+  const currentPrice = useMemo(() => {
+    if (!token0 || !token1 || currentTick === null || currentTick === undefined) {
+      return null;
+    }
+
+    // Sort tokens by address (same as Uniswap V3 does internally)
+    const sortedToken0 = token0.address.toLowerCase() < token1.address.toLowerCase() ? token0 : token1;
+    const sortedToken1 = token0.address.toLowerCase() < token1.address.toLowerCase() ? token1 : token0;
+
+    // Calculate price using sorted tokens
+    const price = calculatePriceFromTick(currentTick, sortedToken0.decimals, sortedToken1.decimals);
+
+    // Handle edge cases (very large prices from calculatePriceFromTick)
+    if (!isFinite(price) || price <= 0 || price > 1e30) {
+      return null;
+    }
+
+    // Determine if we need to invert the price for display
+    // If token0 is not the sorted token0, we need to invert
+    const needsInversion = token0.address.toLowerCase() !== sortedToken0.address.toLowerCase();
+    
+    const displayPrice = needsInversion ? 1 / price : price;
+    
+    // Final check for valid display price
+    if (!isFinite(displayPrice) || displayPrice <= 0) {
+      return null;
+    }
+    
+    return displayPrice;
+  }, [token0, token1, currentTick]);
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -88,7 +121,9 @@ export function PriceRangeSelector({
         <div className="flex justify-between mb-2">
           <span className="text-text-secondary">Current Price</span>
           <span className="font-semibold text-text-primary">
-            {token0 && token1 ? `1 ${token0.symbol} = 1.0 ${token1.symbol}` : '-'}
+            {token0 && token1 && currentPrice !== null
+              ? `1 ${token0.symbol} = ${currentPrice.toFixed(6)} ${token1.symbol}`
+              : '-'}
           </span>
         </div>
         {!fullRange && (
