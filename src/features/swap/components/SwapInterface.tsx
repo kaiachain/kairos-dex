@@ -7,7 +7,7 @@ import { SwapButton } from './SwapButton';
 import { SwapSettings } from './SwapSettings';
 import { PriceInfo } from './PriceInfo';
 import { TerminalStatus } from './TerminalStatus';
-import { ArrowDownUp, Loader2 } from 'lucide-react';
+import { ArrowDownUp, Loader2, AlertCircle, X } from 'lucide-react';
 import { useSwapQuote } from '@/features/swap/hooks/useSwapQuote';
 import { useTokenBalance } from '@/shared/hooks/useTokenBalance';
 import { useSwapStatus } from '@/features/swap/hooks/useSwapStatus';
@@ -18,6 +18,7 @@ import { CONTRACT_WRAPPED_NATIVE_TOKEN, NATIVE_CURRENCY_SYMBOL } from '@/config/
 import { WKAIA_ABI } from '@/abis/WKAIA';
 import { Token } from '@/shared/types/token';
 import { cn } from '@/lib/utils';
+import { normalizeError, getUserFriendlyMessage } from '@/shared/utils/errorHandler';
 
 // Dynamically import SwapConfirmation to reduce initial bundle size
 const SwapConfirmation = lazy(
@@ -138,13 +139,13 @@ export function SwapInterface() {
   const { data: wkaiaBalance, isLoading: isLoadingWkaia, refetch: refetchWkaiaBalance } = useTokenBalance(wkaiaToken);
 
   // Wrap transaction
-  const { writeContract: wrap, data: wrapHash, error: wrapError } = useWriteContract();
+  const { writeContract: wrap, data: wrapHash, error: wrapError, isPending: isWrapPending, status: wrapStatus } = useWriteContract();
   const { isLoading: isWrappingTx, isSuccess: isWrapSuccess } = useWaitForTransactionReceipt({
     hash: wrapHash,
   });
 
   // Unwrap transaction
-  const { writeContract: unwrap, data: unwrapHash, error: unwrapError } = useWriteContract();
+  const { writeContract: unwrap, data: unwrapHash, error: unwrapError, isPending: isUnwrapPending, status: unwrapStatus } = useWriteContract();
   const { isLoading: isUnwrappingTx, isSuccess: isUnwrapSuccess } = useWaitForTransactionReceipt({
     hash: unwrapHash,
   });
@@ -165,6 +166,10 @@ export function SwapInterface() {
   const handleWrap = useCallback(async () => {
     if (!wrapAmount || parseFloat(wrapAmount) <= 0) return;
     if (!isWrapConnected || !address) return;
+    if (!CONTRACT_WRAPPED_NATIVE_TOKEN) {
+      console.error('Wrapped native token contract address not configured');
+      return;
+    }
 
     try {
       const amountWei = parseUnits(wrapAmount, 18);
@@ -176,12 +181,17 @@ export function SwapInterface() {
       });
     } catch (error) {
       console.error('Wrap error:', error);
+      // Error will be handled by wrapError from useWriteContract
     }
   }, [wrapAmount, isWrapConnected, address, wrap]);
 
   const handleUnwrap = useCallback(async () => {
     if (!wrapAmount || parseFloat(wrapAmount) <= 0) return;
     if (!isWrapConnected || !address) return;
+    if (!CONTRACT_WRAPPED_NATIVE_TOKEN) {
+      console.error('Wrapped native token contract address not configured');
+      return;
+    }
 
     try {
       const amountWei = parseUnits(wrapAmount, 18);
@@ -193,6 +203,7 @@ export function SwapInterface() {
       });
     } catch (error) {
       console.error('Unwrap error:', error);
+      // Error will be handled by unwrapError from useWriteContract
     }
   }, [wrapAmount, isWrapConnected, address, unwrap]);
 
@@ -206,14 +217,127 @@ export function SwapInterface() {
     if (isWrapSuccess || isUnwrapSuccess) {
       refetchNativeBalance();
       refetchWkaiaBalance();
+      // Clear dismissed errors on success
+      setDismissedErrors(new Set());
       const timer = setTimeout(() => setWrapAmount(''), 2000);
       return () => clearTimeout(timer);
     }
   }, [isWrapSuccess, isUnwrapSuccess, refetchNativeBalance, refetchWkaiaBalance]);
 
+  // Clear dismissed errors when errors change
+  useEffect(() => {
+    if (!wrapError) {
+      setDismissedErrors(prev => {
+        const next = new Set(prev);
+        next.delete('wrap');
+        return next;
+      });
+    }
+  }, [wrapError]);
+
+  useEffect(() => {
+    if (!unwrapError) {
+      setDismissedErrors(prev => {
+        const next = new Set(prev);
+        next.delete('unwrap');
+        return next;
+      });
+    }
+  }, [unwrapError]);
+
+  useEffect(() => {
+    if (!quoteError) {
+      setDismissedErrors(prev => {
+        const next = new Set(prev);
+        next.delete('quote');
+        return next;
+      });
+    }
+  }, [quoteError]);
+
   const isWrapLoading = isWrappingTx || isUnwrappingTx;
+  const isWrapWaitingSignature = isWrapping ? isWrapPending : isUnwrapPending;
   const wrapCurrentBalance = isWrapping ? nativeBalance?.formatted : wkaiaBalance;
   const isLoadingWrapBalance = isWrapping ? isLoadingNative : isLoadingWkaia;
+
+  // Get button text and state based on current status
+  const getWrapButtonText = useCallback(() => {
+    if (isWrapWaitingSignature) {
+      return isWrapping ? 'Confirm in Wallet...' : 'Confirm Unwrap in Wallet...';
+    }
+    if (isWrapLoading) {
+      return isWrapping ? 'Wrapping...' : 'Unwrapping...';
+    }
+    return isWrapping ? `Wrap ${NATIVE_CURRENCY_SYMBOL}` : `Unwrap W${NATIVE_CURRENCY_SYMBOL}`;
+  }, [isWrapWaitingSignature, isWrapLoading, isWrapping]);
+
+  // Helper function to parse and format error messages
+  const getErrorMessage = useCallback((error: unknown): string => {
+    if (!error) return '';
+    
+    const normalizedError = normalizeError(error);
+    let message = getUserFriendlyMessage(normalizedError);
+    
+    // Handle common wagmi/viem error patterns
+    if (error && typeof error === 'object' && 'message' in error) {
+      const errorMessage = String(error.message).toLowerCase();
+      
+      // User rejected transaction
+      if (errorMessage.includes('user rejected') || errorMessage.includes('user denied')) {
+        return 'Transaction was cancelled.';
+      }
+      
+      // Insufficient funds
+      if (errorMessage.includes('insufficient funds') || errorMessage.includes('insufficient balance')) {
+        return 'Insufficient balance for this transaction.';
+      }
+      
+      // Gas estimation errors
+      if (errorMessage.includes('gas') || errorMessage.includes('execution reverted')) {
+        return 'Transaction failed. Please check your balance and try again.';
+      }
+      
+      // Network errors
+      if (errorMessage.includes('network') || errorMessage.includes('timeout') || errorMessage.includes('fetch')) {
+        return 'Network error. Please check your connection and try again.';
+      }
+      
+      // Contract-specific errors
+      if (errorMessage.includes('revert') || errorMessage.includes('execution')) {
+        // Try to extract revert reason if available
+        const revertMatch = String(error.message).match(/revert\s+(.+)/i);
+        if (revertMatch) {
+          return `Transaction failed: ${revertMatch[1]}`;
+        }
+        return 'Transaction failed. Please try again.';
+      }
+    }
+    
+    return message;
+  }, []);
+
+  // State for error dismissal
+  const [dismissedErrors, setDismissedErrors] = useState<Set<string>>(new Set());
+  
+  const dismissError = useCallback((errorKey: string) => {
+    setDismissedErrors(prev => new Set(prev).add(errorKey));
+  }, []);
+
+  // Get formatted error messages
+  const wrapErrorMessage = useMemo(() => {
+    if (!wrapError) return '';
+    return getErrorMessage(wrapError);
+  }, [wrapError, getErrorMessage]);
+
+  const unwrapErrorMessage = useMemo(() => {
+    if (!unwrapError) return '';
+    return getErrorMessage(unwrapError);
+  }, [unwrapError, getErrorMessage]);
+
+  const quoteErrorMessage = useMemo(() => {
+    if (!quoteError) return '';
+    return getErrorMessage(quoteError);
+  }, [quoteError, getErrorMessage]);
 
   return (
     <div className="bg-white dark:bg-card rounded-3xl shadow-lg p-6 border border-border">
@@ -232,12 +356,15 @@ export function SwapInterface() {
         </button>
         <button
           onClick={() => setActiveTab('wrap')}
+          disabled={!CONTRACT_WRAPPED_NATIVE_TOKEN}
           className={cn(
             'flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200',
             activeTab === 'wrap'
               ? 'bg-white dark:bg-card text-text-primary shadow-sm'
-              : 'text-text-secondary hover:text-text-primary'
+              : 'text-text-secondary hover:text-text-primary',
+            !CONTRACT_WRAPPED_NATIVE_TOKEN && 'opacity-50 cursor-not-allowed'
           )}
+          title={!CONTRACT_WRAPPED_NATIVE_TOKEN ? 'Wrap functionality not configured' : undefined}
         >
           Wrap
         </button>
@@ -319,8 +446,9 @@ export function SwapInterface() {
                 ≈ {formattedAmountOut}
               </span>
             ) : quoteError ? (
-              <span className="text-xs text-error">
-                Quote error
+              <span className="text-xs text-error flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Unable to get quote
               </span>
             ) : null}
           </div>
@@ -348,8 +476,29 @@ export function SwapInterface() {
           </div>
         </div>
 
+        {/* Quote Error Display */}
+        {quoteError && !dismissedErrors.has('quote') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Unable to Get Quote</p>
+              <p className="text-xs text-error/80">{quoteErrorMessage || 'Failed to fetch swap quote. Please try again.'}</p>
+              <p className="text-xs text-text-secondary mt-2">
+                Try: Selecting different tokens, adjusting the amount, or checking your connection.
+              </p>
+            </div>
+            <button
+              onClick={() => dismissError('quote')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
         {/* Price Info */}
-        {showPriceInfo && quote && tokenIn && tokenOut && (
+        {showPriceInfo && quote && tokenIn && tokenOut && !quoteError && (
           <PriceInfo
             quote={quote}
             tokenIn={tokenIn}
@@ -383,6 +532,15 @@ export function SwapInterface() {
           </div>
         )}
       </div>
+      ) : !CONTRACT_WRAPPED_NATIVE_TOKEN ? (
+        /* Wrap Not Configured */
+        <div className="flex flex-col items-center justify-center py-12 px-4">
+          <AlertCircle className="w-12 h-12 text-text-secondary mb-4" />
+          <h3 className="text-lg font-semibold text-text-primary mb-2">Wrap Functionality Unavailable</h3>
+          <p className="text-sm text-text-secondary text-center max-w-md">
+            The wrapped native token contract address is not configured. Please contact the administrator or check your environment configuration.
+          </p>
+        </div>
       ) : (
         /* Wrap/Unwrap Interface */
         <div className="space-y-3">
@@ -405,7 +563,13 @@ export function SwapInterface() {
                   type="text"
                   inputMode="decimal"
                   value={wrapAmount}
-                  onChange={(e) => setWrapAmount(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal point
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setWrapAmount(value);
+                    }
+                  }}
                   placeholder="0"
                   className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-primary placeholder-text-secondary"
                   disabled={!isWrapConnected}
@@ -501,35 +665,58 @@ export function SwapInterface() {
             >
               Insufficient Balance
             </button>
-          ) : isWrapLoading ? (
+          ) : isWrapWaitingSignature || isWrapLoading ? (
             <button
               disabled
-              className="w-full py-4 bg-primary text-bg rounded-xl font-semibold cursor-not-allowed opacity-50"
+              className="w-full py-4 bg-primary text-bg rounded-xl font-semibold cursor-not-allowed opacity-50 flex items-center justify-center gap-2"
             >
-              {isWrapping ? 'Wrapping...' : 'Unwrapping...'}
+              <Loader2 className="w-5 h-5 animate-spin" />
+              {getWrapButtonText()}
             </button>
           ) : (
             <button
               onClick={isWrapping ? handleWrap : handleUnwrap}
               className="w-full py-4 bg-primary text-bg rounded-xl font-semibold hover:opacity-90 transition-colors"
             >
-              {isWrapping ? `Wrap ${NATIVE_CURRENCY_SYMBOL}` : `Unwrap W${NATIVE_CURRENCY_SYMBOL}`}
+              {getWrapButtonText()}
             </button>
           )}
 
           {/* Error Messages */}
-          {wrapError && (
-            <div className="bg-error/20 rounded-xl p-4 border border-error/40">
-              <p className="text-sm text-error">
-                Error: {wrapError.message || 'Failed to wrap tokens'}
-              </p>
+          {wrapError && !dismissedErrors.has('wrap') && (
+            <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+              <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-error mb-1">Wrap Failed</p>
+                <p className="text-xs text-error/80">
+                  {wrapErrorMessage || 'Failed to wrap tokens. Please try again.'}
+                </p>
+              </div>
+              <button
+                onClick={() => dismissError('wrap')}
+                className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+                aria-label="Dismiss error"
+              >
+                <X className="w-4 h-4 text-error" />
+              </button>
             </div>
           )}
-          {unwrapError && (
-            <div className="bg-error/20 rounded-xl p-4 border border-error/40">
-              <p className="text-sm text-error">
-                Error: {unwrapError.message || 'Failed to unwrap tokens'}
-              </p>
+          {unwrapError && !dismissedErrors.has('unwrap') && (
+            <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+              <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-error mb-1">Unwrap Failed</p>
+                <p className="text-xs text-error/80">
+                  {unwrapErrorMessage || 'Failed to unwrap tokens. Please try again.'}
+                </p>
+              </div>
+              <button
+                onClick={() => dismissError('unwrap')}
+                className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+                aria-label="Dismiss error"
+              >
+                <X className="w-4 h-4 text-error" />
+              </button>
             </div>
           )}
 
