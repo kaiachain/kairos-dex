@@ -130,7 +130,7 @@ async function fetchPositions(
                 abi: PositionManager_ABI,
                 functionName: "positions",
                 args: [tokenId],
-              }).catch((err) => {
+              }).catch((err: unknown) => {
                 console.warn(`Error fetching position data for tokenId ${tokenId}:`, err);
                 return null;
               })
@@ -219,12 +219,12 @@ async function fetchPositions(
                     functionName: "getPool",
                     args: [nft.sortedToken0, nft.sortedToken1, nft.fee],
                   })
-                  .then((poolAddr) => {
+                  .then((poolAddr: `0x${string}`) => {
                     return poolAddr && poolAddr !== "0x0000000000000000000000000000000000000000"
                       ? getAddress(poolAddr).toLowerCase()
                       : null;
                   })
-                  .catch((err) => {
+                  .catch((err: unknown) => {
                     console.warn("Error getting pool address:", err);
                     return null;
                   })
