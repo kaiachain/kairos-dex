@@ -9,6 +9,7 @@ import { Plus, Minus, Coins, ExternalLink, Calendar, Zap, Trash2, Info, AlertCir
 import { Link, useNavigate } from 'react-router-dom';
 import { parseUnits, formatUnits } from 'viem';
 import { BLOCK_EXPLORER_URL } from '@/config/env';
+import { calculatePriceFromTick } from '@/lib/subgraph-utils';
 
 interface PositionDetailsProps {
   tokenId: string;
@@ -149,9 +150,36 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
     ? parseFloat(formatUnits(tokensOwed1, position?.token1.decimals || 18))
     : 0;
   
+  // Calculate effective current price (with fallback to tick-based calculation)
+  const isCurrentPriceValid = position
+    ? position.currentPrice > 0 && 
+      !isNaN(position.currentPrice) && 
+      isFinite(position.currentPrice)
+    : false;
+  
+  let effectiveCurrentPrice = position?.currentPrice || 0;
+  
+  // If currentPrice is invalid (0, NaN, or Infinity) but we have a valid currentTick, 
+  // calculate price from tick as fallback
+  if (position && !isCurrentPriceValid && position.currentTick !== undefined) {
+    try {
+      const tickBasedPrice = calculatePriceFromTick(
+        position.currentTick,
+        position.token0.decimals,
+        position.token1.decimals
+      );
+      // Use tick-based price if it's valid
+      if (tickBasedPrice > 0 && isFinite(tickBasedPrice) && !isNaN(tickBasedPrice)) {
+        effectiveCurrentPrice = tickBasedPrice;
+      }
+    } catch (error) {
+      console.warn('Failed to calculate price from tick:', error);
+    }
+  }
+
   // Calculate USD value of uncollected fees
   const uncollectedFeesUSD = position
-    ? uncollectedFees0 * position.currentPrice + uncollectedFees1
+    ? uncollectedFees0 * effectiveCurrentPrice + uncollectedFees1
     : 0;
 
   // Determine if there are fees available to collect
@@ -421,22 +449,19 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
   }
 
   // Check if position is full range (covers all prices)
-  const isFullRange = position.priceMin === 0 && position.priceMax >= FULL_RANGE_THRESHOLD;
+  const isFullRange = position?.priceMin === 0 && position?.priceMax >= FULL_RANGE_THRESHOLD;
   
   // Determine if position is in range
   // For full range positions, always consider them in range
   // For regular positions, use price-based comparison as primary (more intuitive for users)
-  // Tick-based comparison is used as secondary validation
+  // Tick-based comparison is used as fallback when price data is invalid
   let isInRange: boolean;
   if (isFullRange) {
     isInRange = true;
+  } else if (!position) {
+    isInRange = false;
   } else {
-    // Primary check: price-based comparison (what users see and understand)
-    const priceInRange =
-      position.currentPrice >= position.priceMin &&
-      position.currentPrice <= position.priceMax;
-    
-    // Secondary check: tick-based comparison (more accurate for Uniswap V3 mechanics)
+    // Calculate tick-based range check
     let tickInRange: boolean | null = null;
     if (
       position.tickLower !== undefined &&
@@ -446,13 +471,24 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
       tickInRange =
         position.currentTick >= position.tickLower &&
         position.currentTick <= position.tickUpper;
-      
+    }
+    
+    // Primary check: price-based comparison (what users see and understand)
+    const priceInRange = effectiveCurrentPrice > 0
+      ? effectiveCurrentPrice >= position.priceMin &&
+        effectiveCurrentPrice <= position.priceMax
+      : false;
+    
+    // If price-based check fails but tick-based check is available, use tick-based result
+    // This handles cases where price calculation failed but tick data is accurate
+    if (!priceInRange && tickInRange !== null) {
       // Log warning if there's a mismatch (indicates potential data/calculation issue)
-      if (tickInRange !== priceInRange) {
+      if (tickInRange !== priceInRange && isCurrentPriceValid) {
         console.warn('Tick and price range mismatch:', {
           tickInRange,
           priceInRange,
           currentPrice: position.currentPrice,
+          effectiveCurrentPrice,
           priceMin: position.priceMin,
           priceMax: position.priceMax,
           currentTick: position.currentTick,
@@ -460,11 +496,14 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
           tickUpper: position.tickUpper,
         });
       }
+      
+      // Use tick-based result when price is invalid or when there's a mismatch
+      isInRange = !isCurrentPriceValid ? tickInRange : priceInRange;
+    } else {
+      // Use price-based result as primary (what's displayed to users)
+      // This ensures the UI matches what users see in the price range visualization
+      isInRange = priceInRange;
     }
-    
-    // Use price-based result as primary (what's displayed to users)
-    // This ensures the UI matches what users see in the price range visualization
-    isInRange = priceInRange;
   }
 
   // Get all events sorted by timestamp (newest first)
@@ -583,7 +622,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
         <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
           <div className="mb-1 text-sm text-text-secondary">Current Price</div>
           <div className="text-2xl font-bold text-text-primary">
-            {formatNumber(position.currentPrice, 6)}
+            {formatNumber(effectiveCurrentPrice, 6)}
           </div>
           <div className="mt-2 text-xs text-text-secondary">
             {position.token1.symbol} per {position.token0.symbol}
@@ -632,8 +671,8 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                 
                 // Determine how much to extend the range based on current price position
                 // If current price is outside range, extend more to show it
-                const currentBelowMin = position.currentPrice < position.priceMin;
-                const currentAboveMax = position.currentPrice > position.priceMax;
+                const currentBelowMin = effectiveCurrentPrice < position.priceMin;
+                const currentAboveMax = effectiveCurrentPrice > position.priceMax;
                 
                 // Extend range to include current price with context
                 let extendedMin = Math.max(0, position.priceMin - priceRange * 0.2);
@@ -641,10 +680,10 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                 
                 // If current price is outside range, extend further to show it
                 if (currentBelowMin) {
-                  extendedMin = Math.max(0, position.currentPrice - priceRange * 0.1);
+                  extendedMin = Math.max(0, effectiveCurrentPrice - priceRange * 0.1);
                 }
                 if (currentAboveMax) {
-                  extendedMax = position.currentPrice + priceRange * 0.1;
+                  extendedMax = effectiveCurrentPrice + priceRange * 0.1;
                 }
                 
                 const extendedRange = extendedMax - extendedMin;
@@ -652,7 +691,7 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
                 // Calculate positions as percentages
                 const minPercent = ((position.priceMin - extendedMin) / extendedRange) * 100;
                 const maxPercent = ((position.priceMax - extendedMin) / extendedRange) * 100;
-                const currentPercent = ((position.currentPrice - extendedMin) / extendedRange) * 100;
+                const currentPercent = ((effectiveCurrentPrice - extendedMin) / extendedRange) * 100;
                 
                 // Clamp values to 0-100
                 const clampedMin = Math.max(0, Math.min(100, minPercent));
@@ -700,10 +739,10 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
             <div className="flex justify-between px-1 text-xs text-text-secondary">
               <span>{formatNumber(position.priceMin, 4)}</span>
               <span className={`font-semibold ${isInRange ? 'text-text-primary' : 'text-error'}`}>
-                Current: {formatNumber(position.currentPrice, 4)}
+                Current: {formatNumber(effectiveCurrentPrice, 4)}
                 {!isInRange && (
                   <span className="ml-1">
-                    {position.currentPrice < position.priceMin ? '(Below)' : '(Above)'}
+                    {effectiveCurrentPrice < position.priceMin ? '(Below)' : '(Above)'}
                   </span>
                 )}
               </span>

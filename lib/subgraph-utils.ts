@@ -35,16 +35,39 @@ export function subgraphTokenToToken(token: {
  * Calculate price from sqrtPriceX96
  */
 function calculatePriceFromSqrtPriceX96(
-  sqrtPriceX96: string,
+  sqrtPriceX96: string | null | undefined,
   token0Decimals: number,
   token1Decimals: number
 ): number {
-  const Q96 = BigInt(2) ** BigInt(96);
-  const sqrtPrice = BigInt(sqrtPriceX96);
-  const price = Number(sqrtPrice) / Number(Q96);
-  const priceSquared = price ** 2;
-  const decimalsAdjustment = 10 ** (token0Decimals - token1Decimals);
-  return priceSquared * decimalsAdjustment;
+  // Validate input
+  if (!sqrtPriceX96 || sqrtPriceX96 === '0' || sqrtPriceX96 === '') {
+    return 0;
+  }
+
+  try {
+    const Q96 = BigInt(2) ** BigInt(96);
+    const sqrtPrice = BigInt(sqrtPriceX96);
+    
+    // Check if sqrtPrice is valid
+    if (sqrtPrice === 0n) {
+      return 0;
+    }
+    
+    const price = Number(sqrtPrice) / Number(Q96);
+    const priceSquared = price ** 2;
+    const decimalsAdjustment = 10 ** (token0Decimals - token1Decimals);
+    const result = priceSquared * decimalsAdjustment;
+    
+    // Validate result
+    if (!isFinite(result) || isNaN(result) || result <= 0) {
+      return 0;
+    }
+    
+    return result;
+  } catch (error) {
+    console.warn('Error calculating price from sqrtPriceX96:', error);
+    return 0;
+  }
 }
 
 /**
@@ -438,24 +461,6 @@ export function aggregatePositionEvents(
     const token1 = subgraphTokenToToken(pool.token1);
     const feeTier = parseFloat(pool.feeTier) / 10000;
 
-    // Calculate current price
-    // In Uniswap V3: sqrtPriceX96 = sqrt(token1/token0) * 2^96
-    // token0Price = token0/token1, token1Price = token1/token0
-    // We use token1/token0 (token1Price) for consistency with tick calculations
-    let currentPrice: number;
-    if (pool.token1Price) {
-      // token1Price is already token1/token0
-      currentPrice = parseFloat(pool.token1Price);
-    } else {
-      // Calculate from sqrtPriceX96: price = (sqrtPriceX96 / 2^96)^2
-      // This gives token1/token0 (adjusted for decimals)
-      currentPrice = calculatePriceFromSqrtPriceX96(
-        pool.sqrtPrice,
-        token0.decimals,
-        token1.decimals
-      );
-    }
-
     // Calculate price range from ticks
     // Tick price = 1.0001^tick = token1/token0 (adjusted for decimals)
     const tickLower = parseInt(positionData.tickLower, 10);
@@ -473,6 +478,36 @@ export function aggregatePositionEvents(
     
     // Get current tick from pool (if available)
     const currentTick = pool.tick ? parseInt(pool.tick, 10) : null;
+
+    // Calculate current price
+    // In Uniswap V3: sqrtPriceX96 = sqrt(token1/token0) * 2^96
+    // token0Price = token0/token1, token1Price = token1/token0
+    // We use token1/token0 (token1Price) for consistency with tick calculations
+    let currentPrice: number;
+    if (pool.token1Price) {
+      // token1Price is already token1/token0
+      currentPrice = parseFloat(pool.token1Price);
+    } else if (pool.sqrtPrice) {
+      // Calculate from sqrtPriceX96: price = (sqrtPriceX96 / 2^96)^2
+      // This gives token1/token0 (adjusted for decimals)
+      currentPrice = calculatePriceFromSqrtPriceX96(
+        pool.sqrtPrice,
+        token0.decimals,
+        token1.decimals
+      );
+    } else {
+      // Fallback: calculate from current tick if available
+      if (currentTick !== null) {
+        currentPrice = calculatePriceFromTick(
+          currentTick,
+          token0.decimals,
+          token1.decimals
+        );
+      } else {
+        // Last resort: use 0 (will be handled by component logic)
+        currentPrice = 0;
+      }
+    }
 
     // Aggregate liquidity (mints add, burns subtract)
     let liquidity = BigInt(0);
