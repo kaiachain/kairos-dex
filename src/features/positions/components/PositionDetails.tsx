@@ -1,4 +1,3 @@
-![1768811791861](image/PositionDetails/1768811791861.png)
 import { useState, useEffect } from 'react';
 import { usePositionDetails } from '@/features/positions/hooks/usePositionDetails';
 import { formatCurrency, formatNumber, formatBalance } from '@/lib/utils';
