@@ -4,13 +4,23 @@
  */
 
 import { GraphQLClient } from 'graphql-request';
-import { SUBGRAPH_URL } from '@/config/env';
+import { SUBGRAPH_URL, SUBGRAPH_BEARER_TOKEN } from '@/config/env';
 
 class SubgraphClient {
   private client: GraphQLClient;
 
   constructor() {
-    this.client = new GraphQLClient(SUBGRAPH_URL);
+    // Create headers with bearer token if provided
+    const headers: Record<string, string> = {};
+    
+    // Add bearer token for authenticated requests (required for The Graph Network)
+    if (SUBGRAPH_BEARER_TOKEN) {
+      headers['Authorization'] = `Bearer ${SUBGRAPH_BEARER_TOKEN}`;
+    }
+    
+    this.client = new GraphQLClient(SUBGRAPH_URL, {
+      headers,
+    });
   }
 
   async query<T = any>(query: string, variables?: Record<string, any>): Promise<T> {

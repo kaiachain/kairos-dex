@@ -32,7 +32,7 @@ cd ui
 npm install
 ```
 
-Optional: Copy `env.example` to `.env.local` to override defaults.
+Required: Copy `env.example` to `.env.local` and update env variables.
 
 ## Development
 
@@ -54,13 +54,13 @@ Available at [http://localhost:3000](http://localhost:3000)
 
 Kairos testnet defaults:
 
-| Contract | Address |
-|----------|---------|
-| V3CoreFactory | `0xb522cF1A5579c0EAe37Da6797aeBcE1bac2D4a29` |
-| SwapRouter02 | `0xd28909Ef8bd258DCeFD8B5A380ff55f92eD8ae4b` |
+| Contract                   | Address                                        |
+| -------------------------- | ---------------------------------------------- |
+| V3CoreFactory              | `0xb522cF1A5579c0EAe37Da6797aeBcE1bac2D4a29` |
+| SwapRouter02               | `0xd28909Ef8bd258DCeFD8B5A380ff55f92eD8ae4b` |
 | NonfungiblePositionManager | `0x9546E23b2642334E7B82027B09e5c6c8E808F4E3` |
-| QuoterV2 | `0x56a4BD4a66785Af030A2003254E93f111892BfB5` |
-| WKAIA | `0x043c471bee060e00a56ccd02c0ca286808a5a436` |
+| QuoterV2                   | `0x56a4BD4a66785Af030A2003254E93f111892BfB5` |
+| WKAIA                      | `0x043c471bee060e00a56ccd02c0ca286808a5a436` |
 
 Override via environment variables with `VITE_` prefix.
 

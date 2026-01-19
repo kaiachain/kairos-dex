@@ -1,11 +1,19 @@
 import { GraphQLClient } from 'graphql-request';
-import { SUBGRAPH_URL } from '@/config/env';
+import { SUBGRAPH_URL, SUBGRAPH_BEARER_TOKEN } from '@/config/env';
+
+// Create headers with bearer token if provided
+const headers: Record<string, string> = {
+  'Content-Type': 'application/json',
+};
+
+// Add bearer token for authenticated requests (required for The Graph Network)
+if (SUBGRAPH_BEARER_TOKEN) {
+  headers['Authorization'] = `Bearer ${SUBGRAPH_BEARER_TOKEN}`;
+}
 
 // Create a GraphQL client instance
 export const graphqlClient = new GraphQLClient(SUBGRAPH_URL, {
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers,
 });
 
 // Generic query function
