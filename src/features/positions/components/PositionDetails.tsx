@@ -51,16 +51,19 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
       setIsResolvingTokenId(true);
       try {
-        // Parse position key: owner-pool-tickLower-tickUpper
-        const parts = tokenId.split('-');
-        if (parts.length < 4) {
+        // Use position data directly if available (more reliable than parsing tokenId)
+        const tickLower = position.tickLower ?? parseInt(tokenId.split('-')[2] || '0', 10);
+        const tickUpper = position.tickUpper ?? parseInt(tokenId.split('-').slice(-1)[0] || '0', 10);
+        
+        // Validate ticks
+        if (tickLower === 0 && tickUpper === 0) {
           setIsResolvingTokenId(false);
           return;
         }
 
-        const poolAddress = parts[1]?.toLowerCase();
-        const tickLower = parseInt(parts[2] || parts[3] || '0', 10);
-        const tickUpper = parseInt(parts[parts.length - 1] || '0', 10);
+        // Use position data if available to get pool info
+        const expectedToken0 = position.token0.address.toLowerCase();
+        const expectedToken1 = position.token1.address.toLowerCase();
 
         // Get user's NFT balance
         const balance = await publicClient.readContract({
@@ -75,39 +78,82 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
           return;
         }
 
-        // Try to find matching NFT tokenId by checking each NFT
-        for (let i = 0; i < Number(balance); i++) {
+        const balanceNumber = Number(balance);
+        // Limit to reasonable number to prevent excessive calls (e.g., 50 NFTs max)
+        const maxNftsToCheck = Math.min(balanceNumber, 50);
+        
+        // Fetch all tokenIds in parallel
+        const tokenIdPromises = Array.from({ length: maxNftsToCheck }, (_, i) =>
+          publicClient.readContract({
+            address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
+            abi: PositionManager_ABI,
+            functionName: 'tokenOfOwnerByIndex',
+            args: [address, BigInt(i)],
+          }).catch(() => null) // Return null on error to continue processing
+        );
+
+        const tokenIds = await Promise.all(tokenIdPromises);
+        const validTokenIds = tokenIds.filter((id): id is bigint => id !== null);
+
+        if (validTokenIds.length === 0) {
+          setIsResolvingTokenId(false);
+          return;
+        }
+
+        // Fetch all position data in parallel
+        const positionDataPromises = validTokenIds.map((nftTokenId) =>
+          publicClient.readContract({
+            address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
+            abi: PositionManager_ABI,
+            functionName: 'positions',
+            args: [nftTokenId],
+          }).then(
+            (data) => ({ tokenId: nftTokenId, data }),
+            () => null // Return null on error
+          )
+        );
+
+        const positionDataResults = await Promise.all(positionDataPromises);
+        
+        // Find matching position
+        for (const result of positionDataResults) {
+          if (!result) continue;
+
+          const { tokenId: nftTokenId, data: posData } = result;
+          
           try {
-            const nftTokenId = await publicClient.readContract({
-              address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
-              abi: PositionManager_ABI,
-              functionName: 'tokenOfOwnerByIndex',
-              args: [address, BigInt(i)],
-            });
-
-            // Read position data for this NFT
-            const posData = await publicClient.readContract({
-              address: CONTRACTS.NonfungiblePositionManager as `0x${string}`,
-              abi: PositionManager_ABI,
-              functionName: 'positions',
-              args: [nftTokenId],
-            });
-
-            // Check if this position matches: pool, tickLower, tickUpper
-            const posPool = (posData[2] as string).toLowerCase(); // token0 address (we'll check pool differently)
+            // Extract position data
+            const posToken0 = (posData[2] as string).toLowerCase();
+            const posToken1 = (posData[3] as string).toLowerCase();
             const posTickLower = Number(posData[5]); // tickLower
             const posTickUpper = Number(posData[6]); // tickUpper
 
-            // Match by ticks (pool matching is complex, so we rely on ticks + owner)
-            if (posTickLower === tickLower && posTickUpper === tickUpper) {
-              setResolvedNftTokenId(nftTokenId);
-              setIsResolvingTokenId(false);
-              return;
+            // Match by ticks (required) and optionally by token addresses (more accurate)
+            const ticksMatch = posTickLower === tickLower && posTickUpper === tickUpper;
+            
+            if (ticksMatch) {
+              // If we have token addresses from position, verify they match too
+              const tokensMatch = 
+                (posToken0 === expectedToken0 && posToken1 === expectedToken1) ||
+                (posToken0 === expectedToken1 && posToken1 === expectedToken0);
+              
+              // If tokens match or we don't have token info, consider it a match
+              if (tokensMatch || (!expectedToken0 || !expectedToken1)) {
+                setResolvedNftTokenId(nftTokenId);
+                setIsResolvingTokenId(false);
+                return;
+              }
             }
           } catch (err) {
-            // Continue to next NFT if this one fails
+            // Continue to next position if this one fails
             continue;
           }
+        }
+
+        // If we checked max NFTs and didn't find a match, and there are more NFTs,
+        // we could continue checking, but for performance we'll stop here
+        if (balanceNumber > maxNftsToCheck) {
+          console.warn(`Checked ${maxNftsToCheck} NFTs but position not found. User has ${balanceNumber} total NFTs.`);
         }
       } catch (error) {
         console.error('Error resolving NFT tokenId:', error);
