@@ -538,30 +538,30 @@ export function aggregatePositionEvents(
     // Generate position ID from key components
     const tokenId = `${positionData.owner.toLowerCase()}-${pool.id.toLowerCase()}-${tickLower}-${tickUpper}`;
 
-    // Only include positions with positive liquidity
-    if (liquidity > 0) {
-      positions.push({
-        tokenId,
-        token0,
-        token1,
-        feeTier,
-        liquidity: liquidityString,
-        priceMin,
-        priceMax,
-        currentPrice,
-        value,
-        uncollectedFees,
-        feesEarned,
-        createdAt,
-        // Include token amounts for display
-        token0Amount: netToken0,
-        token1Amount: netToken1,
-        // Include tick information for accurate range checking
-        tickLower,
-        tickUpper,
-        currentTick: currentTick ?? undefined,
-      });
-    }
+    // Include all positions, even those with 0 liquidity
+    // Positions with 0 liquidity may still have uncollected fees that need to be collected
+    // We'll filter them later based on liquidity > 0 OR uncollected fees > 0
+    positions.push({
+      tokenId,
+      token0,
+      token1,
+      feeTier,
+      liquidity: liquidityString,
+      priceMin,
+      priceMax,
+      currentPrice,
+      value,
+      uncollectedFees,
+      feesEarned,
+      createdAt,
+      // Include token amounts for display
+      token0Amount: netToken0,
+      token1Amount: netToken1,
+      // Include tick information for accurate range checking
+      tickLower,
+      tickUpper,
+      currentTick: currentTick ?? undefined,
+    });
   });
 
   return positions;
