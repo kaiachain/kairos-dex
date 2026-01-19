@@ -75,6 +75,14 @@ export function useSwapExecution({
   const lastProcessedSwapHash = useRef<string | undefined>(undefined);
   const latestRefetchedAllowance = useRef<bigint | undefined>(undefined);
   const refetchedAllowanceToken = useRef<string | undefined>(undefined);
+  
+  // Track swap parameters for the confirmed swap to detect when form changes
+  const confirmedSwapParamsRef = useRef<{
+    tokenInAddress: string | null;
+    tokenOutAddress: string | null;
+    amountIn: string;
+    swapHash: string;
+  } | null>(null);
 
   const { writeContract: approveToken, data: approveHash } = useWriteContract();
   const { isLoading: isApprovingTx, isSuccess: isApprovalConfirmed } = useWaitForTransactionReceipt({
@@ -110,6 +118,48 @@ export function useSwapExecution({
     },
   });
 
+  // Track swap parameters when swapHash is set (when transaction is sent)
+  // We capture params from a ref that's set in executeSwap to avoid timing issues
+  const pendingSwapParamsRef = useRef<{
+    tokenInAddress: string | null;
+    tokenOutAddress: string | null;
+    amountIn: string;
+  } | null>(null);
+  
+  useEffect(() => {
+    if (swapHash && swapHash !== lastProcessedSwapHash.current && pendingSwapParamsRef.current) {
+      // Store the parameters that were used for this swap at the time it was sent
+      confirmedSwapParamsRef.current = {
+        ...pendingSwapParamsRef.current,
+        swapHash: swapHash,
+      };
+      // Clear pending params after storing
+      pendingSwapParamsRef.current = null;
+    }
+  }, [swapHash]);
+
+  // Clear confirmed swap params when form values change significantly
+  useEffect(() => {
+    if (confirmedSwapParamsRef.current) {
+      const currentParams = {
+        tokenInAddress: tokenIn?.address || null,
+        tokenOutAddress: tokenOut?.address || null,
+        amountIn: amountIn || '',
+      };
+      
+      // If parameters changed significantly, clear the confirmed swap reference
+      // This includes: token changes, or amount changes (even if amount is cleared)
+      const paramsChanged = 
+        confirmedSwapParamsRef.current.tokenInAddress !== currentParams.tokenInAddress ||
+        confirmedSwapParamsRef.current.tokenOutAddress !== currentParams.tokenOutAddress ||
+        confirmedSwapParamsRef.current.amountIn !== currentParams.amountIn;
+      
+      if (paramsChanged) {
+        confirmedSwapParamsRef.current = null;
+      }
+    }
+  }, [tokenIn?.address, tokenOut?.address, amountIn]);
+
   // Update status based on state
   useEffect(() => {
     if (error) {
@@ -117,13 +167,36 @@ export function useSwapExecution({
       return;
     }
 
-    if (isSwapConfirmed) {
+    const currentParams = {
+      tokenInAddress: tokenIn?.address || null,
+      tokenOutAddress: tokenOut?.address || null,
+      amountIn: amountIn || '',
+    };
+
+    // Check if swapHash belongs to the current swap parameters
+    // Only consider it valid if we have confirmed swap params that match
+    const isCurrentSwap = confirmedSwapParamsRef.current !== null &&
+      confirmedSwapParamsRef.current.swapHash === swapHash &&
+      confirmedSwapParamsRef.current.tokenInAddress === currentParams.tokenInAddress &&
+      confirmedSwapParamsRef.current.tokenOutAddress === currentParams.tokenOutAddress &&
+      confirmedSwapParamsRef.current.amountIn === currentParams.amountIn;
+
+    // Only show swap_confirmed if:
+    // 1. Swap is confirmed (from wagmi)
+    // 2. We have a swapHash
+    // 3. We have confirmed swap params (form hasn't changed)
+    // 4. The swapHash matches the current swap parameters
+    // This prevents showing "Swap Confirmed" when form values change after a swap
+    if (isSwapConfirmed && swapHash && confirmedSwapParamsRef.current !== null && isCurrentSwap) {
       setStatus('swap_confirmed');
       return;
     }
 
-    if (isSwapping || swapHash) {
-      setStatus(swapHash ? 'swap_pending' : 'swapping');
+    // Only consider swapHash if it belongs to the current swap
+    // If confirmedSwapParamsRef is null, it means form values changed, so ignore old swapHash
+    // Otherwise, ignore it (it's from a previous swap with different parameters)
+    if (isSwapping || (swapHash && isCurrentSwap)) {
+      setStatus(swapHash && isCurrentSwap ? 'swap_pending' : 'swapping');
       return;
     }
 
@@ -165,6 +238,9 @@ export function useSwapExecution({
     approveHash,
     needsApproval,
     quote,
+    tokenIn?.address,
+    tokenOut?.address,
+    amountIn,
   ]);
 
   // Handle swap errors
@@ -388,6 +464,14 @@ export function useSwapExecution({
       setStatus('swapping');
       addStatusMessage('loading', 'Sending swap transaction...', 'Waiting for wallet confirmation');
       console.log('Sending swap transaction...');
+      
+      // Capture swap parameters at execution time (before they might be cleared)
+      pendingSwapParamsRef.current = {
+        tokenInAddress: tokenIn.address,
+        tokenOutAddress: tokenOut.address,
+        amountIn: amountIn,
+      };
+      
       sendSwapTransaction({
         to: CONTRACTS.SwapRouter02 as `0x${string}`,
         data: routeResult.methodParameters.calldata as `0x${string}`,

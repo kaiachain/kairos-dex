@@ -1,5 +1,5 @@
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { TokenSelector } from "@/features/swap/components/TokenSelector";
 import { Token } from "@/shared/types/token";
 import { Pool } from "@/features/pools/types/pool";
@@ -27,8 +27,8 @@ import { useTokenBalance } from "@/shared/hooks/useTokenBalance";
 import { usePools } from "@/features/pools/hooks/usePools";
 import { calculatePriceFromTick } from "@/lib/subgraph-utils";
 import { erc20Abi, encodeFunctionData } from "viem";
-import { Search } from "lucide-react";
-import { showToast } from "@/lib/showToast";
+import { Search, AlertCircle, X, Loader2, CheckCircle2 } from "lucide-react";
+import { normalizeError, getUserFriendlyMessage } from "@/shared/utils/errorHandler";
 
 interface AddLiquidityProps {
   initialToken0?: Token | null;
@@ -55,12 +55,17 @@ export function AddLiquidity({
   const [priceRange, setPriceRange] = useState({ min: "", max: "" });
   const [fullRange, setFullRange] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showTxError, setShowTxError] = useState(false);
   const [initialPrice, setInitialPrice] = useState("");
   const [showInitPrompt, setShowInitPrompt] = useState(false);
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [poolSearchQuery, setPoolSearchQuery] = useState("");
   const [calculatedPriceRange, setCalculatedPriceRange] = useState<{ min: number | null; max: number | null }>({ min: null, max: null });
+  
+  // State for validation errors
+  const [validationError, setValidationError] = useState<string | null>(null);
+  
+  // State for error dismissal
+  const [dismissedErrors, setDismissedErrors] = useState<Set<string>>(new Set());
   
   // Fetch pools for selection when coming from Positions page
   const { pools, isLoading: isLoadingPools } = usePools();
@@ -70,6 +75,7 @@ export function AddLiquidity({
     writeContract: addLiquidity,
     data: hash,
     error: mintError,
+    isPending: isMintPending,
   } = useWriteContract();
 
   // Wait for transaction confirmation
@@ -77,31 +83,10 @@ export function AddLiquidity({
     isLoading: isConfirming,
     isSuccess: isConfirmed,
     isError: isTxError,
+    error: txError,
   } = useWaitForTransactionReceipt({
     hash,
   });
-
-  // Show transaction errors when they occur
-  useEffect(() => {
-    if (mintError || isTxError) {
-      setShowTxError(true);
-      // Log detailed error for debugging
-      if (mintError) {
-        console.error("Mint error:", mintError);
-        const errorMessage = mintError.message || String(mintError);
-        if (errorMessage.includes("uint(9)") || errorMessage.includes("error code 9")) {
-          console.error("Error Code 9: Amount mismatch for first liquidity addition");
-        }
-      }
-    }
-  }, [mintError, isTxError]);
-
-  // Clear transaction errors when user starts typing new amounts
-  useEffect(() => {
-    if (amount0 || amount1) {
-      setShowTxError(false);
-    }
-  }, [amount0, amount1]);
 
   // Check token allowances
   const { data: allowance0, refetch: refetchAllowance0 } = useReadContract({
@@ -130,11 +115,19 @@ export function AddLiquidity({
     },
   });
 
-  const { writeContract: approveToken, data: approveHash } = useWriteContract();
-  const { isLoading: isApproving, isSuccess: isApproved } =
-    useWaitForTransactionReceipt({
-      hash: approveHash,
-    });
+  const { 
+    writeContract: approveToken, 
+    data: approveHash,
+    error: approveError,
+    isPending: isApprovePending,
+  } = useWriteContract();
+  const { 
+    isLoading: isApproving, 
+    isSuccess: isApproved,
+    error: approveTxError,
+  } = useWaitForTransactionReceipt({
+    hash: approveHash,
+  });
 
   // Check if approvals are needed
   const needsApproval0 =
@@ -299,6 +292,7 @@ export function AddLiquidity({
     writeContract: initializePool,
     data: initHash,
     error: initWriteError,
+    isPending: isInitPending,
   } = useWriteContract();
   const {
     isLoading: isInitLoading,
@@ -308,12 +302,78 @@ export function AddLiquidity({
     hash: initHash,
   });
 
+  // Helper function to parse and format error messages
+  const getErrorMessage = useCallback((error: unknown): string => {
+    if (!error) return '';
+    
+    const normalizedError = normalizeError(error);
+    let message = getUserFriendlyMessage(normalizedError);
+    
+    // Handle common wagmi/viem error patterns
+    if (error && typeof error === 'object' && 'message' in error) {
+      const errorMessage = String(error.message).toLowerCase();
+      
+      // User rejected transaction
+      if (errorMessage.includes('user rejected') || errorMessage.includes('user denied')) {
+        return 'Transaction was cancelled.';
+      }
+      
+      // Insufficient funds
+      if (errorMessage.includes('insufficient funds') || errorMessage.includes('insufficient balance')) {
+        return 'Insufficient balance for this transaction.';
+      }
+      
+      // Gas estimation errors
+      if (errorMessage.includes('gas') || errorMessage.includes('execution reverted')) {
+        return 'Transaction failed. Please check your balance and try again.';
+      }
+      
+      // Network errors
+      if (errorMessage.includes('network') || errorMessage.includes('timeout') || errorMessage.includes('fetch')) {
+        return 'Network error. Please check your connection and try again.';
+      }
+      
+      // Contract-specific errors
+      if (errorMessage.includes('revert') || errorMessage.includes('execution')) {
+        // Try to extract revert reason if available
+        const revertMatch = String(error.message).match(/revert\s+(.+)/i);
+        if (revertMatch) {
+          return `Transaction failed: ${revertMatch[1]}`;
+        }
+        return 'Transaction failed. Please try again.';
+      }
+    }
+    
+    return message;
+  }, []);
+
+  const dismissError = useCallback((errorKey: string) => {
+    setDismissedErrors(prev => new Set(prev).add(errorKey));
+  }, []);
+
+  // Clear validation error when form changes
+  useEffect(() => {
+    if (validationError) {
+      setValidationError(null);
+    }
+  }, [token0, token1, amount0, amount1, fee, priceRange, fullRange]);
+
+  // Clear dismissed errors when errors change
+  useEffect(() => {
+    if (!mintError && !txError && !approveError && !approveTxError && !initWriteError && !initTxError) {
+      setDismissedErrors(new Set());
+    }
+  }, [mintError, txError, approveError, approveTxError, initWriteError, initTxError]);
+
   const handleInitializePool = () => {
     if (!poolAddress || !initialPrice || !token0 || !token1) return;
 
+    // Clear previous validation errors
+    setValidationError(null);
+
     const priceValue = parseFloat(initialPrice);
     if (isNaN(priceValue) || priceValue <= 0) {
-      alert("Please enter a valid initial price (greater than 0)");
+      setValidationError("Please enter a valid initial price (greater than 0)");
       return;
     }
 
@@ -446,18 +506,17 @@ export function AddLiquidity({
   };
 
   const handleAddLiquidity = () => {
+    // Clear previous validation errors
+    setValidationError(null);
+
     // Check wallet connection first
     if (!isConnected) {
-      showToast({
-        type: 'warning',
-        title: 'Wallet Not Connected',
-        description: 'Please connect your wallet first to add liquidity',
-      });
+      setValidationError("Please connect your wallet first to add liquidity");
       return;
     }
 
     if (!token0 || !token1 || !amount0 || !amount1) {
-      console.error("Missing tokens or amounts:", { token0, token1, amount0, amount1 });
+      setValidationError("Please select both tokens and enter amounts");
       return;
     }
 
@@ -466,8 +525,7 @@ export function AddLiquidity({
     const amount1Num = parseFloat(amount1);
     
     if (isNaN(amount0Num) || isNaN(amount1Num) || amount0Num <= 0 || amount1Num <= 0) {
-      console.error("Invalid amounts:", { amount0: amount0Num, amount1: amount1Num });
-      alert("Please enter valid amounts greater than 0 for both tokens");
+      setValidationError("Please enter valid amounts greater than 0 for both tokens");
       return;
     }
 
@@ -505,7 +563,7 @@ export function AddLiquidity({
 
     // Validate amounts are valid numbers
     if (!amt0 || !amt1 || isNaN(parseFloat(amt0)) || isNaN(parseFloat(amt1))) {
-      console.error("Invalid amounts:", { amt0, amt1 });
+      setValidationError("Invalid amounts. Please check your inputs.");
       return;
     }
 
@@ -639,17 +697,13 @@ export function AddLiquidity({
       amount1Desired = parseUnits(amt1, t1.decimals);
     } catch (error) {
       console.error("Error parsing amounts:", error);
-      alert("Error parsing token amounts. Please check your inputs.");
+      setValidationError("Error parsing token amounts. Please check your inputs.");
       return;
     }
 
     // Validate parsed amounts are greater than 0
     if (amount0Desired === BigInt(0) || amount1Desired === BigInt(0)) {
-      console.error("Amounts must be greater than 0:", {
-        amount0Desired: amount0Desired.toString(),
-        amount1Desired: amount1Desired.toString(),
-      });
-      alert("Both token amounts must be greater than 0");
+      setValidationError("Both token amounts must be greater than 0");
       return;
     }
 
@@ -780,8 +834,44 @@ export function AddLiquidity({
       });
     } catch (error) {
       console.error("Add liquidity error:", error);
+      setValidationError(
+        `Failed to add liquidity: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   };
+
+  // Get formatted error messages
+  const mintErrorMessage = useMemo(() => {
+    if (!mintError) return '';
+    return getErrorMessage(mintError);
+  }, [mintError, getErrorMessage]);
+
+  const txErrorMessage = useMemo(() => {
+    if (!txError) return '';
+    return getErrorMessage(txError);
+  }, [txError, getErrorMessage]);
+
+  const approveErrorMessage = useMemo(() => {
+    if (!approveError) return '';
+    return getErrorMessage(approveError);
+  }, [approveError, getErrorMessage]);
+
+  const approveTxErrorMessage = useMemo(() => {
+    if (!approveTxError) return '';
+    return getErrorMessage(approveTxError);
+  }, [approveTxError, getErrorMessage]);
+
+  const initPoolErrorMessage = useMemo(() => {
+    if (!initWriteError) return '';
+    return getErrorMessage(initWriteError);
+  }, [initWriteError, getErrorMessage]);
+
+  const initPoolTxErrorMessage = useMemo(() => {
+    if (!initTxError) return '';
+    return getErrorMessage(initTxError);
+  }, [initTxError, getErrorMessage]);
 
   return (
     <div className="bg-white dark:bg-card rounded-3xl shadow-lg p-6 border border-border w-full">
@@ -914,7 +1004,6 @@ export function AddLiquidity({
                 value={amount0}
                 onChange={(e) => {
                   setAmount0(e.target.value);
-                  setShowTxError(false);
                 }}
                 placeholder="0.0"
                 disabled={showPoolSelector}
@@ -955,7 +1044,6 @@ export function AddLiquidity({
                 value={amount1}
                 onChange={(e) => {
                   setAmount1(e.target.value);
-                  setShowTxError(false);
                 }}
                 placeholder="0.0"
                 disabled={showPoolSelector}
@@ -1022,18 +1110,106 @@ export function AddLiquidity({
           </div>
         )}
 
-        {/* Error Display */}
-        {showTxError && (mintError || isTxError) && (
-          <div className="bg-error/20 border border-error/40 rounded-lg p-4">
-            <p className="text-error text-sm">
-              {mintError?.message ||
-                "Transaction failed. Please check your inputs and try again."}
-            </p>
-            {(mintError?.message?.includes("uint(9)") || mintError?.message?.includes("error code 9")) && (
-              <p className="text-error text-xs mt-2">
-                <strong>Error Code 9:</strong> This usually means the token amounts don't match the current price ratio. For a newly initialized pool, amounts must match the initialization price exactly.
+        {/* Validation Error Display */}
+        {validationError && !dismissedErrors.has('validation') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Validation Error</p>
+              <p className="text-xs text-error/80">{validationError}</p>
+            </div>
+            <button
+              onClick={() => dismissError('validation')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
+        {/* Add Liquidity Error Display */}
+        {mintError && !dismissedErrors.has('mint') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Add Liquidity Failed</p>
+              <p className="text-xs text-error/80">
+                {mintErrorMessage || 'Failed to add liquidity. Please try again.'}
               </p>
-            )}
+              {(mintError?.message?.includes("uint(9)") || mintError?.message?.includes("error code 9")) && (
+                <p className="text-xs text-text-secondary mt-2">
+                  <strong>Error Code 9:</strong> This usually means the token amounts don't match the current price ratio. For a newly initialized pool, amounts must match the initialization price exactly.
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => dismissError('mint')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
+        {/* Transaction Error Display */}
+        {txError && !dismissedErrors.has('tx') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Transaction Failed</p>
+              <p className="text-xs text-error/80">
+                {txErrorMessage || 'Liquidity addition transaction failed. Please try again.'}
+              </p>
+            </div>
+            <button
+              onClick={() => dismissError('tx')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
+        {/* Approval Error Display */}
+        {approveError && !dismissedErrors.has('approve') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Approval Failed</p>
+              <p className="text-xs text-error/80">
+                {approveErrorMessage || 'Failed to approve token. Please try again.'}
+              </p>
+            </div>
+            <button
+              onClick={() => dismissError('approve')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
+        {/* Approval Transaction Error Display */}
+        {approveTxError && !dismissedErrors.has('approveTx') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Approval Transaction Failed</p>
+              <p className="text-xs text-error/80">
+                {approveTxErrorMessage || 'Token approval transaction failed. Please try again.'}
+              </p>
+            </div>
+            <button
+              onClick={() => dismissError('approveTx')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
           </div>
         )}
 
@@ -1090,13 +1266,43 @@ export function AddLiquidity({
                 </p>
               </div>
 
-              {(initWriteError || initTxError) && (
-                <div className="bg-error/20 border border-error/40 rounded-lg p-3">
-                  <p className="text-error text-xs">
-                    {initWriteError?.message ||
-                      initTxError?.message ||
-                      "Failed to initialize pool"}
-                  </p>
+              {/* Initialize Pool Error Display */}
+              {initWriteError && !dismissedErrors.has('initPool') && (
+                <div className="flex items-start gap-3 p-3 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+                  <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-error mb-1">Initialize Pool Failed</p>
+                    <p className="text-xs text-error/80">
+                      {initPoolErrorMessage || 'Failed to initialize pool. Please try again.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => dismissError('initPool')}
+                    className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+                    aria-label="Dismiss error"
+                  >
+                    <X className="w-4 h-4 text-error" />
+                  </button>
+                </div>
+              )}
+
+              {/* Initialize Pool Transaction Error Display */}
+              {initTxError && !dismissedErrors.has('initPoolTx') && (
+                <div className="flex items-start gap-3 p-3 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+                  <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-error mb-1">Initialization Transaction Failed</p>
+                    <p className="text-xs text-error/80">
+                      {initPoolTxErrorMessage || 'Pool initialization transaction failed. Please try again.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => dismissError('initPoolTx')}
+                    className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+                    aria-label="Dismiss error"
+                  >
+                    <X className="w-4 h-4 text-error" />
+                  </button>
                 </div>
               )}
 
@@ -1142,9 +1348,11 @@ export function AddLiquidity({
             hasErrors ||
             isConfirming ||
             isApproving ||
+            isApprovePending ||
+            isMintPending ||
             poolNeedsInitialization
           }
-          className={`w-full py-4 rounded-2xl font-semibold transition-all shadow-md hover:shadow-lg ${
+          className={`w-full py-4 rounded-2xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 ${
             !token0 ||
             !token1 ||
             !amount0 ||
@@ -1152,22 +1360,47 @@ export function AddLiquidity({
             hasErrors ||
             isConfirming ||
             isApproving ||
+            isApprovePending ||
+            isMintPending ||
             poolNeedsInitialization
               ? "bg-secondary text-text-secondary cursor-not-allowed hover:shadow-md"
+              : showSuccess
+              ? "bg-success text-bg cursor-not-allowed"
               : "bg-primary text-bg hover:opacity-90"
           }`}
         >
-          {isApproving
-            ? "Approving..."
-            : needsApproval
-            ? `Approve ${needsApproval0 ? token0?.symbol : token1?.symbol}`
-            : isConfirming
-            ? "Confirming..."
-            : showSuccess
-            ? "Transaction Confirmed!"
-            : poolNeedsInitialization
-            ? "Pool Needs Initialization"
-            : "Add Liquidity"}
+          {isApprovePending ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Confirm Approval in Wallet...</span>
+            </>
+          ) : isApproving ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Approving {needsApproval0 ? token0?.symbol : token1?.symbol}...</span>
+            </>
+          ) : isMintPending ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Confirm in Wallet...</span>
+            </>
+          ) : isConfirming ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Adding Liquidity...</span>
+            </>
+          ) : showSuccess ? (
+            <>
+              <CheckCircle2 className="w-5 h-5" />
+              <span>Transaction Confirmed!</span>
+            </>
+          ) : needsApproval ? (
+            `Approve ${needsApproval0 ? token0?.symbol : token1?.symbol}`
+          ) : poolNeedsInitialization ? (
+            "Pool Needs Initialization"
+          ) : (
+            "Add Liquidity"
+          )}
         </button>
       </div>
     </div>

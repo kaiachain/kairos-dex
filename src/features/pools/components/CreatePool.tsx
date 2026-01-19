@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { TokenSelector } from "@/features/swap/components/TokenSelector";
 import { Token } from "@/shared/types/token";
 import { FEE_TIERS } from "@/config/contracts";
@@ -13,6 +13,8 @@ import { CONTRACTS } from "@/config/contracts";
 import { Factory_ABI } from "@/abis/Factory";
 import { Pool_ABI } from "@/abis/Pool";
 import { parseUnits, priceToSqrtPriceX96 } from "@/lib/utils";
+import { normalizeError, getUserFriendlyMessage } from "@/shared/utils/errorHandler";
+import { AlertCircle, X } from "lucide-react";
 
 export function CreatePool() {
   const [token0, setToken0] = useState<Token | null>(null);
@@ -49,17 +51,88 @@ export function CreatePool() {
 
   // State to track pool address after creation
   const [poolAddress, setPoolAddress] = useState<string | null>(null);
+  
+  // State for validation errors
+  const [validationError, setValidationError] = useState<string | null>(null);
+  
+  // State for error dismissal
+  const [dismissedErrors, setDismissedErrors] = useState<Set<string>>(new Set());
+
+  // Helper function to parse and format error messages
+  const getErrorMessage = useCallback((error: unknown): string => {
+    if (!error) return '';
+    
+    const normalizedError = normalizeError(error);
+    let message = getUserFriendlyMessage(normalizedError);
+    
+    // Handle common wagmi/viem error patterns
+    if (error && typeof error === 'object' && 'message' in error) {
+      const errorMessage = String(error.message).toLowerCase();
+      
+      // User rejected transaction
+      if (errorMessage.includes('user rejected') || errorMessage.includes('user denied')) {
+        return 'Transaction was cancelled.';
+      }
+      
+      // Insufficient funds
+      if (errorMessage.includes('insufficient funds') || errorMessage.includes('insufficient balance')) {
+        return 'Insufficient balance for this transaction.';
+      }
+      
+      // Gas estimation errors
+      if (errorMessage.includes('gas') || errorMessage.includes('execution reverted')) {
+        return 'Transaction failed. Please check your balance and try again.';
+      }
+      
+      // Network errors
+      if (errorMessage.includes('network') || errorMessage.includes('timeout') || errorMessage.includes('fetch')) {
+        return 'Network error. Please check your connection and try again.';
+      }
+      
+      // Contract-specific errors
+      if (errorMessage.includes('revert') || errorMessage.includes('execution')) {
+        // Try to extract revert reason if available
+        const revertMatch = String(error.message).match(/revert\s+(.+)/i);
+        if (revertMatch) {
+          return `Transaction failed: ${revertMatch[1]}`;
+        }
+        return 'Transaction failed. Please try again.';
+      }
+    }
+    
+    return message;
+  }, []);
+
+  const dismissError = useCallback((errorKey: string) => {
+    setDismissedErrors(prev => new Set(prev).add(errorKey));
+  }, []);
+
+  // Clear validation error when form changes
+  useEffect(() => {
+    if (validationError) {
+      setValidationError(null);
+    }
+  }, [token0, token1, initialPrice, fee]);
+
+  // Clear dismissed errors when errors change
+  useEffect(() => {
+    if (!writeError && !txError && !initWriteError && !initTxError) {
+      setDismissedErrors(new Set());
+    }
+  }, [writeError, txError, initWriteError, initTxError]);
 
   const handleCreatePool = () => {
+    // Clear previous validation errors
+    setValidationError(null);
     // Validate wallet connection
     if (!isConnected) {
-      alert("Please connect your wallet to create a pool.");
+      setValidationError("Please connect your wallet to create a pool.");
       return;
     }
 
     // Validate tokens are selected
     if (!token0 || !token1) {
-      alert("Please select both tokens to create a pool.");
+      setValidationError("Please select both tokens to create a pool.");
       return;
     }
 
@@ -69,7 +142,7 @@ export function CreatePool() {
       !token0.address ||
       token0.address === "0x0000000000000000000000000000000000000000"
     ) {
-      alert(
+      setValidationError(
         "Token 0 address is invalid. For native KAIA, please use WKAIA (Wrapped KAIA) address instead of zero address."
       );
       return;
@@ -79,7 +152,7 @@ export function CreatePool() {
       !token1.address ||
       token1.address === "0x0000000000000000000000000000000000000000"
     ) {
-      alert(
+      setValidationError(
         "Token 1 address is invalid. For native KAIA, please use WKAIA (Wrapped KAIA) address instead of zero address."
       );
       return;
@@ -87,19 +160,19 @@ export function CreatePool() {
 
     // Validate tokens are different
     if (token0.address.toLowerCase() === token1.address.toLowerCase()) {
-      alert("Please select two different tokens.");
+      setValidationError("Please select two different tokens.");
       return;
     }
 
     // Validate initial price is a valid number
     if (!initialPrice) {
-      alert("Please enter an initial price for the pool.");
+      setValidationError("Please enter an initial price for the pool.");
       return;
     }
 
     const priceValue = parseFloat(initialPrice);
     if (isNaN(priceValue) || priceValue <= 0) {
-      alert("Please enter a valid initial price (greater than 0)");
+      setValidationError("Please enter a valid initial price (greater than 0)");
       return;
     }
 
@@ -122,7 +195,7 @@ export function CreatePool() {
       t0Address === "0x0000000000000000000000000000000000000000" ||
       t1Address === "0x0000000000000000000000000000000000000000"
     ) {
-      alert(
+      setValidationError(
         "Invalid token address detected. Please try selecting the tokens again."
       );
       return;
@@ -143,7 +216,7 @@ export function CreatePool() {
       });
     } catch (error) {
       console.error("Error creating pool:", error);
-      alert(
+      setValidationError(
         `Failed to create pool: ${
           error instanceof Error ? error.message : "Unknown error"
         }`
@@ -240,6 +313,27 @@ export function CreatePool() {
     !isValidPrice ||
     !isConnected ||
     isLoadingOrPending;
+
+  // Get formatted error messages
+  const createPoolErrorMessage = useMemo(() => {
+    if (!writeError) return '';
+    return getErrorMessage(writeError);
+  }, [writeError, getErrorMessage]);
+
+  const createPoolTxErrorMessage = useMemo(() => {
+    if (!txError) return '';
+    return getErrorMessage(txError);
+  }, [txError, getErrorMessage]);
+
+  const initPoolErrorMessage = useMemo(() => {
+    if (!initWriteError) return '';
+    return getErrorMessage(initWriteError);
+  }, [initWriteError, getErrorMessage]);
+
+  const initPoolTxErrorMessage = useMemo(() => {
+    if (!initTxError) return '';
+    return getErrorMessage(initTxError);
+  }, [initTxError, getErrorMessage]);
 
   // Display errors if any
   const displayError = writeError || txError || initWriteError || initTxError;
@@ -350,24 +444,106 @@ export function CreatePool() {
           </div>
         )}
 
-        {displayError && (
-          <div className="p-4 bg-error/20 border border-error/40 rounded-lg">
-            <p className="text-sm text-error font-semibold mb-1">
-              Transaction Failed
-            </p>
-            <p className="text-xs text-error">
-              {writeError?.message ||
-                txError?.message ||
-                initWriteError?.message ||
-                initTxError?.message ||
-                "Unknown error occurred"}
-            </p>
-            {writeError?.message?.includes("reverted") && (
-              <p className="text-xs text-error mt-2">
-                Common causes: Invalid token addresses, pool already exists, or
-                insufficient gas.
+        {/* Validation Error Display */}
+        {validationError && !dismissedErrors.has('validation') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Validation Error</p>
+              <p className="text-xs text-error/80">{validationError}</p>
+            </div>
+            <button
+              onClick={() => dismissError('validation')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
+        {/* Create Pool Error Display */}
+        {writeError && !dismissedErrors.has('createPool') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Create Pool Failed</p>
+              <p className="text-xs text-error/80">
+                {createPoolErrorMessage || 'Failed to create pool. Please try again.'}
               </p>
-            )}
+              {writeError?.message?.includes("reverted") && (
+                <p className="text-xs text-text-secondary mt-2">
+                  Common causes: Invalid token addresses, pool already exists, or insufficient gas.
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => dismissError('createPool')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
+        {/* Create Pool Transaction Error Display */}
+        {txError && !dismissedErrors.has('createPoolTx') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Transaction Failed</p>
+              <p className="text-xs text-error/80">
+                {createPoolTxErrorMessage || 'Pool creation transaction failed. Please try again.'}
+              </p>
+            </div>
+            <button
+              onClick={() => dismissError('createPoolTx')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
+        {/* Initialize Pool Error Display */}
+        {initWriteError && !dismissedErrors.has('initPool') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Initialize Pool Failed</p>
+              <p className="text-xs text-error/80">
+                {initPoolErrorMessage || 'Failed to initialize pool. Please try again.'}
+              </p>
+            </div>
+            <button
+              onClick={() => dismissError('initPool')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
+          </div>
+        )}
+
+        {/* Initialize Pool Transaction Error Display */}
+        {initTxError && !dismissedErrors.has('initPoolTx') && (
+          <div className="flex items-start gap-3 p-4 bg-error/10 dark:bg-error/5 rounded-xl border border-error/30">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-error mb-1">Initialization Transaction Failed</p>
+              <p className="text-xs text-error/80">
+                {initPoolTxErrorMessage || 'Pool initialization transaction failed. Please try again.'}
+              </p>
+            </div>
+            <button
+              onClick={() => dismissError('initPoolTx')}
+              className="p-1 hover:bg-error/20 rounded transition-colors flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4 text-error" />
+            </button>
           </div>
         )}
 
