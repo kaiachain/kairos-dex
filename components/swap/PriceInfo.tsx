@@ -1,11 +1,10 @@
-'use client';
 
 import { useState, useEffect } from 'react';
 import { Token } from '@/types/token';
 import { SwapQuote } from '@/types/swap';
 import { formatNumber, formatBalance } from '@/lib/utils';
 import { Info, AlertTriangle } from 'lucide-react';
-import { calculatePriceImpact, calculateSuggestedSlippage, calculateOptimalSwapSize } from '@/lib/swap-utils';
+import { calculatePriceImpact, calculateSuggestedSlippage } from '@/lib/swap-utils';
 import { usePoolDetails } from '@/hooks/usePoolDetails';
 import { RouteDisplay } from './RouteDisplay';
 
@@ -19,7 +18,6 @@ interface PriceInfoProps {
 
 export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: PriceInfoProps) {
   const [priceImpact, setPriceImpact] = useState<number>(quote.priceImpact || 0);
-  const [optimalSwapSize, setOptimalSwapSize] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const { pool } = usePoolDetails(quote.poolAddress || '');
 
@@ -31,24 +29,17 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
 
       setIsCalculating(true);
       try {
-        const impact = await calculatePriceImpact(
-          amountIn,
-          quote.amountOut,
-          tokenIn,
-          tokenOut,
-          quote.poolAddress,
-          quote.fee
-        );
-        setPriceImpact(impact);
-
-        // Calculate optimal swap size
-        const optimal = await calculateOptimalSwapSize(
-          quote.poolAddress,
-          tokenIn,
-          tokenOut,
-          quote.fee
-        );
-        setOptimalSwapSize(optimal);
+        if (quote.fee !== undefined && quote.poolAddress) {
+          const impact = await calculatePriceImpact(
+            amountIn,
+            quote.amountOut,
+            tokenIn,
+            tokenOut,
+            quote.poolAddress,
+            quote.fee
+          );
+          setPriceImpact(impact);
+        }
       } catch (error) {
         console.error('Error calculating price impact:', error);
       } finally {
@@ -158,19 +149,6 @@ export function PriceInfo({ quote, tokenIn, tokenOut, slippage, amountIn }: Pric
             {suggestedSlippage > slippage && (
               <div>Consider increasing slippage to {suggestedSlippage.toFixed(1)}%</div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Optimal Swap Size Suggestion */}
-      {optimalSwapSize && parseFloat(amountIn) > parseFloat(optimalSwapSize) * 1.2 && (
-        <div className="flex items-start space-x-2 p-2 bg-primary/20 rounded text-primary border border-primary/40">
-          <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <div className="text-xs">
-            <div className="font-semibold">Swap size suggestion</div>
-            <div>
-              For better price execution, consider swapping {optimalSwapSize} {tokenIn.symbol} or less.
-            </div>
           </div>
         </div>
       )}

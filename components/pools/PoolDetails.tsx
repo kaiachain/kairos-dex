@@ -1,11 +1,10 @@
-'use client';
 
 import { usePoolDetails } from '@/hooks/usePoolDetails';
 import { formatCurrency, formatNumber, formatAddress } from '@/lib/utils';
 import { useAccount } from 'wagmi';
 import { showToast } from '@/lib/showToast';
 import { Plus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 
 interface PoolDetailsProps {
   poolAddress: string;
@@ -14,7 +13,7 @@ interface PoolDetailsProps {
 export function PoolDetails({ poolAddress }: PoolDetailsProps) {
   const { pool, isLoading } = usePoolDetails(poolAddress);
   const { isConnected } = useAccount();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const handleAddLiquidityClick = () => {
     if (!isConnected) {
@@ -30,7 +29,7 @@ export function PoolDetails({ poolAddress }: PoolDetailsProps) {
         token1: pool.token1.address,
         fee: pool.feeTier.toString(),
       });
-      router.push(`/add-liquidity?${params.toString()}`);
+      navigate(`/add-liquidity?${params.toString()}`);
     }
   };
 

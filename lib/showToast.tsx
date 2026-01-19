@@ -1,4 +1,3 @@
-'use client';
 
 import { ReactNode, FunctionComponent, SVGProps, MouseEventHandler, useMemo } from 'react';
 import { toast } from 'react-toastify';

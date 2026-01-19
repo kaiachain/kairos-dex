@@ -1,4 +1,3 @@
-'use client';
 
 import { useProtocolStats } from '@/hooks/useProtocolStats';
 import { formatCurrency, formatNumber } from '@/lib/utils';

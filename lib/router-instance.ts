@@ -6,8 +6,7 @@
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { ChainId, Token as SDKToken } from "@uniswap/sdk-core";
 import { getAddress } from "@ethersproject/address";
-import { CHAIN_ID, RPC_URL, SUBGRAPH_URL, CONTRACT_WRAPPED_NATIVE_TOKEN } from "@/config/env";
-import state from "../state.json";
+import { CHAIN_ID, RPC_URL, SUBGRAPH_URL, SUBGRAPH_BEARER_TOKEN, CONTRACT_WRAPPED_NATIVE_TOKEN, CONTRACT_MULTICALL2 } from "@/config/env";
 import {
   setupRouterPatches,
   patchTokenEquals,
@@ -183,7 +182,7 @@ async function loadRouterModules() {
 /**
  * Patch get-candidate-pools to handle missing token lists at runtime
  */
-function patchGetCandidatePools() {
+async function patchGetCandidatePools() {
   try {
     const candidatePaths = [
       '@uniswap/smart-order-router/build/main/routers/alpha-router/functions/get-candidate-pools',
@@ -192,9 +191,9 @@ function patchGetCandidatePools() {
     
     for (const getCandidatePoolsPath of candidatePaths) {
       try {
-        const getCandidatePoolsModule = require(getCandidatePoolsPath);
+        const getCandidatePoolsModule = await import(/* @vite-ignore */ getCandidatePoolsPath);
         if (getCandidatePoolsModule) {
-          const originalGetCandidatePools = getCandidatePoolsModule.getCandidatePools || getCandidatePoolsModule.default;
+          const originalGetCandidatePools = getCandidatePoolsModule.getCandidatePools || getCandidatePoolsModule.default || (getCandidatePoolsModule.default && getCandidatePoolsModule.default.default ? getCandidatePoolsModule.default.default : null);
           if (originalGetCandidatePools && typeof originalGetCandidatePools === 'function') {
             const wrapped = async (...args: any[]) => {
               try {
@@ -232,15 +231,17 @@ function patchGetCandidatePools() {
 /**
  * Create OnChainQuoteProvider with proper configuration
  */
-function createOnChainQuoteProvider(provider: JsonRpcProvider, multicall2Provider: any) {
+async function createOnChainQuoteProvider(provider: JsonRpcProvider, multicall2Provider: any) {
   try {
+    const configsModule = await import("@uniswap/smart-order-router/build/main/util/onchainQuoteProviderConfigs");
+    const configs = configsModule.default || configsModule;
     const {
       DEFAULT_BATCH_PARAMS,
       DEFAULT_RETRY_OPTIONS,
       DEFAULT_GAS_ERROR_FAILURE_OVERRIDES,
       DEFAULT_SUCCESS_RATE_FAILURE_OVERRIDES,
       DEFAULT_BLOCK_NUMBER_CONFIGS,
-    } = require("@uniswap/smart-order-router/build/main/util/onchainQuoteProviderConfigs");
+    } = configs;
 
     // Optimize batch params - balance between speed and multi-hop support
     const customBatchParams = () => ({
@@ -319,19 +320,28 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
     return routerInstance;
   }
 
-  // Prevent concurrent initialization
+  // Prevent concurrent initialization - use Promise-based waiting instead of busy-wait
   if (routerInitializing) {
-    let retries = 0;
-    while (routerInitializing && retries < 10) {
-      const start = Date.now();
-      while (Date.now() - start < 100) {
-        // Busy wait
-      }
-      retries++;
-    }
-    if (routerInstance) {
-      return routerInstance;
-    }
+    // Wait for initialization to complete with timeout
+    return new Promise((resolve, reject) => {
+      const maxWaitTime = 10000; // 10 seconds max wait
+      const startTime = Date.now();
+      const checkInterval = 100; // Check every 100ms
+
+      const checkInitialization = setInterval(() => {
+        if (routerInstance && routerInitialized) {
+          clearInterval(checkInitialization);
+          resolve(routerInstance);
+          return;
+        }
+
+        if (Date.now() - startTime > maxWaitTime) {
+          clearInterval(checkInitialization);
+          reject(new Error('Router initialization timeout'));
+          return;
+        }
+      }, checkInterval);
+    });
   }
 
   routerInitializing = true;
@@ -342,10 +352,10 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
       const WKAIA_TOKEN = createWKAIAToken();
       const USDT_TOKEN = createUSDTToken();
       
-      setupRouterPatches(CHAIN_ID, WKAIA_TOKEN, USDT_TOKEN);
+      await setupRouterPatches(CHAIN_ID, WKAIA_TOKEN, USDT_TOKEN);
       patchTokenEquals();
       patchCurrencyAmount();
-      patchGetCandidatePools();
+      await patchGetCandidatePools();
       
       routerInitialized = true;
     }
@@ -354,10 +364,10 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
     const rpcProvider = provider || new JsonRpcProvider(RPC_URL);
 
     // Create providers
-    const multicall2Provider = createMulticallProvider(
+    const multicall2Provider = await createMulticallProvider(
       CHAIN_ID,
       rpcProvider,
-      state.multicall2Address
+      CONTRACT_MULTICALL2
     );
 
     // Optimize subgraph provider - balance between speed and multi-hop support
@@ -370,7 +380,7 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
       0.01,
       Number.MAX_VALUE,
       SUBGRAPH_URL,
-      process.env.NEXT_PUBLIC_SUBGRAPH_BEARER_TOKEN || "d1c0ffba8f198132674e26bb04cec97d"
+      SUBGRAPH_BEARER_TOKEN
     );
 
     // Optimize pool provider - allow retries for multi-hop routes
@@ -380,7 +390,7 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
       { retries: 1, minTimeout: 50, maxTimeout: 500 } // Allow 1 retry for multi-hop reliability
     );
 
-    const onChainQuoteProvider = createOnChainQuoteProvider(rpcProvider, multicall2Provider);
+    const onChainQuoteProvider = await createOnChainQuoteProvider(rpcProvider, multicall2Provider);
 
     // Create router
     const router = new AlphaRouter({

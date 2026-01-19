@@ -1,6 +1,5 @@
-"use client";
-
-import Link from "next/link";
+import React from "react";
+import { Link } from "react-router-dom";
 import { Position } from "@/types/position";
 import { formatCurrency, formatNumber, formatBalance } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Plus, Minus, Coins } from "lucide-react";
@@ -12,7 +11,7 @@ interface PositionCardProps {
   collectCount?: number;
 }
 
-export function PositionCard({
+function PositionCardComponent({
   position,
   mintCount = 0,
   burnCount = 0,
@@ -48,7 +47,7 @@ export function PositionCard({
   }
 
   return (
-    <Link href={`/positions/${position.tokenId}`}>
+    <Link to={`/positions/${position.tokenId}`}>
       <div className="bg-white dark:bg-card rounded-xl p-6 border border-border hover:shadow-lg transition-shadow cursor-pointer">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
@@ -184,3 +183,6 @@ export function PositionCard({
     </Link>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+export const PositionCard = React.memo(PositionCardComponent);

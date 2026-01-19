@@ -1,4 +1,3 @@
-"use client";
 
 import { useState, useEffect } from "react";
 import { TokenSelector } from "@/components/swap/TokenSelector";
@@ -247,15 +246,15 @@ export function CreatePool() {
   const isFullySuccess = isSuccess && isInitSuccess;
 
   return (
-    <div className="bg-white dark:bg-card rounded-3xl shadow-lg p-6 border border-border">
+    <div className="p-6 bg-white rounded-3xl border shadow-lg dark:bg-card border-border">
       <div className="space-y-3">
         {/* Token 0 Input */}
         <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Token 0</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-xs font-medium tracking-wide uppercase text-text-secondary">Token 0</label>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 relative">
+          <div className="flex gap-3 items-center">
+            <div className="relative flex-1">
               <div className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-primary min-h-[42px] flex items-center">
                 {token0 ? token0.symbol : <span className="text-text-secondary">Select token</span>}
               </div>
@@ -270,11 +269,11 @@ export function CreatePool() {
 
         {/* Token 1 Input */}
         <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Token 1</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-xs font-medium tracking-wide uppercase text-text-secondary">Token 1</label>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 relative">
+          <div className="flex gap-3 items-center">
+            <div className="relative flex-1">
               <div className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-primary min-h-[42px] flex items-center">
                 {token1 ? token1.symbol : <span className="text-text-secondary">Select token</span>}
               </div>
@@ -288,8 +287,8 @@ export function CreatePool() {
         </div>
 
         {/* Fee Tier */}
-        <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border">
-          <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide mb-3">Fee Tier</label>
+        <div className="p-4 bg-gray-50 rounded-2xl border dark:bg-input-bg border-border">
+          <label className="block mb-3 text-xs font-medium tracking-wide uppercase text-text-secondary">Fee Tier</label>
           <div className="grid grid-cols-4 gap-2">
             {FEE_TIERS.map((tier) => (
               <button
@@ -318,13 +317,13 @@ export function CreatePool() {
 
         {/* Initial Price Input */}
         <div className="bg-gray-50 dark:bg-input-bg rounded-2xl p-4 border border-border hover:border-[color:var(--border-hover)] transition-colors">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-xs font-medium tracking-wide uppercase text-text-secondary">
               Initial Price
             </label>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 relative">
+          <div className="flex gap-3 items-center">
+            <div className="relative flex-1">
               <input
                 type="text"
                 inputMode="decimal"
@@ -334,7 +333,7 @@ export function CreatePool() {
                 className="w-full text-3xl font-semibold bg-transparent border-none outline-none text-text-primary placeholder-text-secondary"
               />
               {token0 && token1 && (
-                <p className="text-xs text-text-secondary mt-1">
+                <p className="mt-1 text-xs text-text-secondary">
                   {token1.symbol} per {token0.symbol}
                 </p>
               )}
@@ -344,7 +343,7 @@ export function CreatePool() {
 
         {/* Status Messages */}
         {!isConnected && (
-          <div className="p-4 bg-secondary/20 border border-secondary/40 rounded-lg">
+          <div className="p-4 rounded-lg border bg-secondary/20 border-secondary/40">
             <p className="text-sm text-text-primary">
               Please connect your wallet to create a pool.
             </p>
@@ -352,8 +351,8 @@ export function CreatePool() {
         )}
 
         {displayError && (
-          <div className="p-4 bg-error/20 border border-error/40 rounded-lg">
-            <p className="text-sm text-error font-semibold mb-1">
+          <div className="p-4 rounded-lg border bg-error/20 border-error/40">
+            <p className="mb-1 text-sm font-semibold text-error">
               Transaction Failed
             </p>
             <p className="text-xs text-error">
@@ -364,7 +363,7 @@ export function CreatePool() {
                 "Unknown error occurred"}
             </p>
             {writeError?.message?.includes("reverted") && (
-              <p className="text-xs text-error mt-2">
+              <p className="mt-2 text-xs text-error">
                 Common causes: Invalid token addresses, pool already exists, or
                 insufficient gas.
               </p>
@@ -373,12 +372,12 @@ export function CreatePool() {
         )}
 
         {isSuccess && !isInitSuccess && (
-          <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
-            <p className="text-sm text-text-primary font-semibold mb-1">
+          <div className="p-4 rounded-lg border bg-primary/10 border-primary/20">
+            <p className="mb-1 text-sm font-semibold text-text-primary">
               Pool Created! Initializing...
             </p>
             {hash && (
-              <p className="text-xs text-text-secondary font-mono">
+              <p className="font-mono text-xs text-text-secondary">
                 Create TX: {hash.slice(0, 10)}...{hash.slice(-8)}
               </p>
             )}
@@ -386,23 +385,23 @@ export function CreatePool() {
         )}
 
         {isFullySuccess && (
-          <div className="p-4 bg-success/20 border border-success/40 rounded-lg">
-            <p className="text-sm text-success font-semibold mb-1">
+          <div className="p-4 rounded-lg border bg-success/20 border-success/40">
+            <p className="mb-1 text-sm font-semibold text-success">
               Pool Created and Initialized Successfully! 🎉
             </p>
             {poolAddress && (
-              <p className="text-xs text-text-primary break-all font-mono mt-1">
+              <p className="mt-1 font-mono text-xs break-all text-text-primary">
                 Pool Address: {poolAddress}
               </p>
             )}
             <div className="mt-2 space-y-1">
               {hash && (
-                <p className="text-xs text-text-secondary font-mono">
+                <p className="font-mono text-xs text-text-secondary">
                   Create TX: {hash.slice(0, 10)}...{hash.slice(-8)}
                 </p>
               )}
               {initHash && (
-                <p className="text-xs text-text-secondary font-mono">
+                <p className="font-mono text-xs text-text-secondary">
                   Init TX: {initHash.slice(0, 10)}...{initHash.slice(-8)}
                 </p>
               )}
@@ -416,7 +415,7 @@ export function CreatePool() {
           disabled={isButtonDisabled}
           className={`w-full py-4 rounded-2xl font-semibold transition-all shadow-md hover:shadow-lg ${
             isButtonDisabled
-              ? "bg-secondary text-text-secondary cursor-not-allowed hover:shadow-md"
+              ? "cursor-not-allowed bg-secondary text-text-secondary hover:shadow-md"
               : "bg-primary text-bg hover:opacity-90"
           }`}
         >

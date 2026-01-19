@@ -186,5 +186,82 @@ export function usePositionDetails(tokenId: string) {
     fetchPosition();
   }, [tokenId]);
 
-  return { position, isLoading, events };
+  const refetch = async () => {
+    if (!tokenId) {
+      setPosition(null);
+      setEvents(null);
+      setIsLoading(false);
+      return { position: null, isLoading: false, events: null };
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Parse position ID to get components
+      const positionParts = parsePositionId(tokenId);
+      if (!positionParts) {
+        console.warn("Invalid position ID format:", tokenId);
+        setPosition(null);
+        setEvents(null);
+        setIsLoading(false);
+        return { position: null, isLoading: false, events: null };
+      }
+
+      // Try to fetch from subgraph using Mint, Burn, and Collect events
+      try {
+        const response = await query<SubgraphPositionByTicksResponse>(
+          GET_POSITION_BY_TICKS_QUERY,
+          {
+            owner: positionParts.owner as `0x${string}`,
+            pool: positionParts.pool as `0x${string}`,
+            tickLower: positionParts.tickLower,
+            tickUpper: positionParts.tickUpper,
+          }
+        );
+
+        setEvents(response);
+
+        if (response.mints || response.burns || response.collects) {
+          // Aggregate events into positions
+          const positions = aggregatePositionEvents(
+            response.mints || [],
+            response.burns || [],
+            response.collects || []
+          );
+
+          // Find the matching position
+          const positionData = positions.find((p) => p.tokenId === tokenId);
+          if (positionData) {
+            // Enhance position with event arrays
+            const positionWithEvents: PositionWithEvents = {
+              ...positionData,
+              mints: response.mints || [],
+              burns: response.burns || [],
+              collects: response.collects || [],
+            };
+            setPosition(positionWithEvents);
+            setIsLoading(false);
+            return { position: positionWithEvents, isLoading: false, events: response };
+          }
+        }
+      } catch (subgraphError) {
+        console.warn(
+          "Failed to fetch position from subgraph:",
+          subgraphError
+        );
+      }
+
+      // If not found in subgraph, return null
+      setPosition(null);
+      setIsLoading(false);
+      return { position: null, isLoading: false, events: null };
+    } catch (error) {
+      console.error("Error fetching position details:", error);
+      setPosition(null);
+      setIsLoading(false);
+      return { position: null, isLoading: false, events: null };
+    }
+  };
+
+  return { position, isLoading, events, refetch };
 }
