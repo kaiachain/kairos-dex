@@ -667,8 +667,8 @@ export function PositionDetails({ tokenId }: PositionDetailsProps) {
 
         <div className="p-6 bg-white rounded-xl border dark:bg-card border-border">
           <div className="mb-1 text-sm text-text-secondary">Current Price</div>
-          <div className="text-2xl font-bold text-text-primary">
-            {formatNumber(effectiveCurrentPrice, 6)}
+          <div className="overflow-hidden text-2xl font-bold break-words text-text-primary">
+            {formatBalance(effectiveCurrentPrice, 4)}
           </div>
           <div className="mt-2 text-xs text-text-secondary">
             {position.token1.symbol} per {position.token0.symbol}
