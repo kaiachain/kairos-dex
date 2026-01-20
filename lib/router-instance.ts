@@ -23,6 +23,25 @@ let V3SubgraphProvider: any;
 let V3PoolProvider: any;
 let OnChainQuoteProvider: any;
 
+// Export SwapType so other modules can use it
+export function getSwapType() {
+  if (!SwapType) {
+    console.warn('⚠️ SwapType is not loaded. Attempting to load it...');
+    // Try to load it synchronously if possible, but this is async so we can't do much
+  }
+  return SwapType;
+}
+
+// Also make SwapType available on window for router's internal code if needed
+if (typeof window !== 'undefined') {
+  // This ensures SwapType is available globally if the router's internal code needs it
+  Object.defineProperty(window, '__UNISWAP_SWAP_TYPE__', {
+    get: () => SwapType,
+    configurable: true,
+    enumerable: false,
+  });
+}
+
 // Router instance cache
 let routerInstance: any = null;
 let routerInitialized = false;
@@ -77,8 +96,53 @@ async function loadRouterModules() {
   let onChainQuoteModule: any = null;
   
   // Try to load the main router module
+  // In production builds, the module might be evaluated during bundling
+  // so we need to handle errors that occur during dynamic import
   try {
     routerModule = await import("@uniswap/smart-order-router/build/main");
+    
+    // Even if import succeeds, check if AlphaRouter is available
+    // Sometimes the module loads but AlphaRouter is undefined due to token list errors
+    if (routerModule && !routerModule.AlphaRouter) {
+      console.warn('⚠️ Router module loaded but AlphaRouter is undefined. This may be due to token list errors.');
+      console.warn('Attempting to load AlphaRouter directly from alpha-router module...');
+      
+      // Try to load AlphaRouter directly from the alpha-router module
+      // Don't try to modify routerModule (it may be frozen), assign directly to module variables
+      try {
+        const alphaRouterModule = await import("@uniswap/smart-order-router/build/main/routers/alpha-router/alpha-router");
+        if (alphaRouterModule && alphaRouterModule.AlphaRouter) {
+          // Assign directly to module variables instead of modifying routerModule
+          AlphaRouter = alphaRouterModule.AlphaRouter;
+          
+          // SwapType is exported from routers/router, not alpha-router
+          // Try to get it from the router module or main module
+          try {
+            const routerModuleForSwapType = await import("@uniswap/smart-order-router/build/main/routers/router");
+            if (routerModuleForSwapType && routerModuleForSwapType.SwapType) {
+              SwapType = routerModuleForSwapType.SwapType;
+            } else {
+              // Fallback to main module
+              const mainModule = await import("@uniswap/smart-order-router/build/main");
+              if (mainModule && mainModule.SwapType) {
+                SwapType = mainModule.SwapType;
+              }
+            }
+          } catch (swapTypeError: any) {
+            // SwapType is optional, continue without it
+            console.warn('⚠️ Could not load SwapType (this is non-critical):', swapTypeError?.message || swapTypeError);
+          }
+          console.log('✅ Successfully loaded AlphaRouter directly from alpha-router module');
+          // Mark routerModule as successfully loaded even though we got AlphaRouter from elsewhere
+          routerModule = { ...routerModule, AlphaRouter, SwapType } as any;
+        } else {
+          routerModule = null; // Reset to trigger retry
+        }
+      } catch (directImportError: any) {
+        console.warn('⚠️ Failed to load AlphaRouter directly:', directImportError.message);
+        routerModule = null; // Reset to trigger retry
+      }
+    }
   } catch (importError: any) {
     const errorMessage = importError?.message || String(importError);
     const errorStack = importError?.stack || '';
@@ -86,8 +150,10 @@ async function loadRouterModules() {
       errorMessage.includes('DAI_OPTIMISM_SEPOLIA') ||
       errorMessage.includes('Cannot read properties of undefined') ||
       errorMessage.includes('reading \'DAI_OPTIMISM_SEPOLIA\'') ||
+      errorMessage.includes('token list') ||
       errorStack.includes('DAI_OPTIMISM_SEPOLIA') ||
-      errorStack.includes('get-candidate-pools');
+      errorStack.includes('get-candidate-pools') ||
+      errorStack.includes('token-provider');
     
     if (!isTokenListError) {
       throw importError;
@@ -95,6 +161,7 @@ async function loadRouterModules() {
     
     console.warn('⚠️ Token list error detected during router module import.');
     console.warn('This is expected for KAIA chain. The error occurs during module evaluation.');
+    console.warn('Attempting to continue with patched modules...');
   }
   
   try {
@@ -140,9 +207,15 @@ async function loadRouterModules() {
   }
   
   // Assign modules if they loaded successfully
+  // Note: AlphaRouter and SwapType may have been loaded directly above, so check if they're already set
   if (routerModule) {
-    AlphaRouter = routerModule.AlphaRouter;
-    SwapType = routerModule.SwapType;
+    // Only assign if not already set (from direct import above)
+    if (!AlphaRouter && routerModule.AlphaRouter) {
+      AlphaRouter = routerModule.AlphaRouter;
+    }
+    if (!SwapType && routerModule.SwapType) {
+      SwapType = routerModule.SwapType;
+    }
   }
   if (v3SubgraphModule) {
     V3SubgraphProvider = v3SubgraphModule.V3SubgraphProvider;
@@ -175,6 +248,53 @@ async function loadRouterModules() {
         'The token list error is preventing the router module from loading. ' +
         'Please ensure the webpack replacement is working correctly.'
       );
+    }
+  }
+  
+  // CRITICAL: Ensure SwapType is loaded - router's internal code needs it
+  // The router's buildSwapMethodParameters function accesses SwapType.UNIVERSAL_ROUTER
+  // So SwapType must be available in the router's module scope
+  if (!SwapType) {
+    console.warn('⚠️ SwapType not loaded, attempting to load it (CRITICAL for router)...');
+    try {
+      // Try loading from routers/router first (most reliable)
+      const routerModuleForSwapType = await import("@uniswap/smart-order-router/build/main/routers/router");
+      if (routerModuleForSwapType && routerModuleForSwapType.SwapType) {
+        SwapType = routerModuleForSwapType.SwapType;
+        console.log('✅ SwapType loaded from routers/router');
+      } else {
+        // Fallback to main module
+        const mainModule = await import("@uniswap/smart-order-router/build/main");
+        if (mainModule && mainModule.SwapType) {
+          SwapType = mainModule.SwapType;
+          console.log('✅ SwapType loaded from main module');
+        }
+      }
+    } catch (swapTypeError: any) {
+      console.error('❌ Failed to load SwapType:', swapTypeError);
+      // This is critical - router will fail without SwapType
+    }
+  }
+  
+  // Verify SwapType is available and has the required properties
+  if (!SwapType) {
+    console.error('❌ SwapType is still undefined after all attempts');
+    console.error('⚠️ Router will fail when trying to build method parameters');
+    // Don't throw here - let the router try to load it itself
+    // The Vite plugin should have patched methodParameters.js to handle this
+    console.warn('⚠️ Continuing without SwapType - Vite plugin should handle this in methodParameters.js');
+  } else {
+    // Verify SwapType has the required properties
+    if (!SwapType.UNIVERSAL_ROUTER && !SwapType.SWAP_ROUTER_02) {
+      console.error('❌ SwapType loaded but missing required properties');
+      console.warn('⚠️ SwapType may not work correctly');
+    } else {
+      console.log('✅ SwapType verified:', {
+        hasUNIVERSAL_ROUTER: !!SwapType.UNIVERSAL_ROUTER,
+        hasSWAP_ROUTER_02: !!SwapType.SWAP_ROUTER_02,
+        UNIVERSAL_ROUTER: SwapType.UNIVERSAL_ROUTER,
+        SWAP_ROUTER_02: SwapType.SWAP_ROUTER_02,
+      });
     }
   }
 }

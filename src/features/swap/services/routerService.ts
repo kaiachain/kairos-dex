@@ -210,8 +210,19 @@ export async function getQuoteFromRouter(
     }
 
     const router = await getRouterInstance(provider);
-    const routerModule = await import("@uniswap/smart-order-router/build/main");
-    const SwapType = routerModule.SwapType;
+    // Get SwapType from the router instance module instead of importing directly
+    // This ensures we get the properly loaded SwapType even if main module has issues
+    const { getSwapType } = await import("@/lib/router-instance");
+    let swapTypeToUse = getSwapType();
+    
+    if (!swapTypeToUse) {
+      // Fallback: try to import directly if getSwapType returns undefined
+      const routerModule = await import("@uniswap/smart-order-router/build/main");
+      swapTypeToUse = routerModule.SwapType;
+      if (!swapTypeToUse) {
+        throw new Error('SwapType is not available. Router may not have loaded correctly.');
+      }
+    }
 
     const sdkTokenIn = tokenToSDKToken(tokenIn);
     const sdkTokenOut = tokenToSDKToken(tokenOut);
@@ -223,7 +234,7 @@ export async function getQuoteFromRouter(
       recipient: "0x0000000000000000000000000000000000000000",
       slippageTolerance: new Percent(50, 10_000), // 0.5% default
       deadline: Math.floor(Date.now() / 1000) + 60 * 20,
-      type: SwapType?.SWAP_ROUTER_02 ?? 1,
+      type: swapTypeToUse?.SWAP_ROUTER_02 ?? 1,
     };
 
     console.log(`Finding route: ${tokenIn.symbol} -> ${tokenOut.symbol} (may be multi-hop)`);
@@ -421,14 +432,25 @@ export async function getRouterRoute(
         console.log(`Regenerating methodParameters with updated settings...`);
         addStatusMessage('info', 'Updating methodParameters...', 'Using cached route (should be fast)');
         
-        const routerModule = await import("@uniswap/smart-order-router/build/main");
-        const SwapType = routerModule.SwapType;
+        // Get SwapType from the router instance module instead of importing directly
+        const { getSwapType } = await import("@/lib/router-instance");
+        const SwapType = getSwapType();
+        
+        let swapTypeToUse = SwapType;
+        if (!swapTypeToUse) {
+          // Fallback: try to import directly if getSwapType returns undefined
+          const routerModule = await import("@uniswap/smart-order-router/build/main");
+          swapTypeToUse = routerModule.SwapType;
+          if (!swapTypeToUse) {
+            throw new Error('SwapType is not available. Router may not have loaded correctly.');
+          }
+        }
         
         const options = {
           recipient,
           slippageTolerance: new Percent(Math.floor(slippageTolerance * 100), 10_000),
           deadline: Math.floor(Date.now() / 1000) + 60 * deadlineMinutes,
-          type: SwapType?.SWAP_ROUTER_02 ?? 1,
+          type: swapTypeToUse?.SWAP_ROUTER_02 ?? 1,
         };
         
         const router = await getRouterInstance(provider);
@@ -455,14 +477,25 @@ export async function getRouterRoute(
         console.log(`Reusing cached route for execution...`);
         addStatusMessage('info', 'Found cached route', 'Regenerating methodParameters...');
         
-        const routerModule = await import("@uniswap/smart-order-router/build/main");
-        const SwapType = routerModule.SwapType;
+        // Get SwapType from the router instance module instead of importing directly
+        const { getSwapType } = await import("@/lib/router-instance");
+        const SwapType = getSwapType();
+        
+        let swapTypeToUse = SwapType;
+        if (!swapTypeToUse) {
+          // Fallback: try to import directly if getSwapType returns undefined
+          const routerModule = await import("@uniswap/smart-order-router/build/main");
+          swapTypeToUse = routerModule.SwapType;
+          if (!swapTypeToUse) {
+            throw new Error('SwapType is not available. Router may not have loaded correctly.');
+          }
+        }
         
         const options = {
           recipient,
           slippageTolerance: new Percent(Math.floor(slippageTolerance * 100), 10_000),
           deadline: Math.floor(Date.now() / 1000) + 60 * deadlineMinutes,
-          type: SwapType?.SWAP_ROUTER_02 ?? 1,
+          type: swapTypeToUse?.SWAP_ROUTER_02 ?? 1,
         };
         
         const router = await getRouterInstance(provider);
@@ -490,8 +523,19 @@ export async function getRouterRoute(
     addStatusMessage('loading', `Getting fresh route for execution...`, `${tokenIn.symbol} → ${tokenOut.symbol}`);
     
     const router = await getRouterInstance(provider);
-    const routerModule = await import("@uniswap/smart-order-router/build/main");
-    const SwapType = routerModule.SwapType;
+    // Get SwapType from the router instance module instead of importing directly
+    const { getSwapType } = await import("@/lib/router-instance");
+    const SwapType = getSwapType();
+    
+    let swapTypeToUse = SwapType;
+    if (!swapTypeToUse) {
+      // Fallback: try to import directly if getSwapType returns undefined
+      const routerModule = await import("@uniswap/smart-order-router/build/main");
+      swapTypeToUse = routerModule.SwapType;
+      if (!swapTypeToUse) {
+        throw new Error('SwapType is not available. Router may not have loaded correctly.');
+      }
+    }
 
     const sdkTokenIn = tokenToSDKToken(tokenIn);
     const sdkTokenOut = tokenToSDKToken(tokenOut);
@@ -503,7 +547,7 @@ export async function getRouterRoute(
       recipient,
       slippageTolerance: new Percent(Math.floor(slippageTolerance * 100), 10_000),
       deadline: Math.floor(Date.now() / 1000) + 60 * deadlineMinutes,
-      type: SwapType?.SWAP_ROUTER_02 ?? 1,
+      type: swapTypeToUse?.SWAP_ROUTER_02 ?? 1,
     };
 
     const route = await router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, options);

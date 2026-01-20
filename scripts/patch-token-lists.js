@@ -58,29 +58,40 @@ const WBTC_OPTIMISM_SEPOLIA = undefined;`);
   {
     path: 'node_modules/@uniswap/smart-order-router/build/main/routers/alpha-router/functions/get-candidate-pools.js',
     patch: (content) => {
-      // Same patch for main build path
+      // Same patch for main build path (CommonJS version)
       if (content.includes('DAI_OPTIMISM_SEPOLIA') && !content.includes('// PATCHED')) {
-        const importPattern = /import\s*\{\s*DAI_OPTIMISM_SEPOLIA,\s*isPoolFeeDynamic,\s*USDC_ARBITRUM_SEPOLIA,\s*USDC_OPTIMISM_SEPOLIA,\s*USDT_OPTIMISM_SEPOLIA,\s*WBTC_OPTIMISM_SEPOLIA,\s*\}\s*from\s*['"]\.\.\/\.\.\/\.\.\/providers['"];/;
+        // Handle CommonJS require() pattern
+        // Pattern: const providers_1 = require("../../../providers");
+        const requirePattern = /const\s+providers_1\s*=\s*require\(['"]\.\.\/\.\.\/\.\.\/providers['"]\);/;
         
-        if (importPattern.test(content)) {
-          content = content.replace(importPattern, `// PATCHED: Safe import for KAIA chain
-import * as _providers from '../../../providers';
-const DAI_OPTIMISM_SEPOLIA = _providers.DAI_OPTIMISM_SEPOLIA;
-const isPoolFeeDynamic = _providers.isPoolFeeDynamic;
-const USDC_ARBITRUM_SEPOLIA = _providers.USDC_ARBITRUM_SEPOLIA;
-const USDC_OPTIMISM_SEPOLIA = _providers.USDC_OPTIMISM_SEPOLIA;
-const USDT_OPTIMISM_SEPOLIA = _providers.USDT_OPTIMISM_SEPOLIA;
-const WBTC_OPTIMISM_SEPOLIA = _providers.WBTC_OPTIMISM_SEPOLIA;`);
+        if (requirePattern.test(content)) {
+          // Replace with safe version that handles undefined tokens
+          content = content.replace(requirePattern, `// PATCHED: Safe require for KAIA chain
+const providers_1 = require("../../../providers");
+// Ensure problematic tokens are undefined to prevent errors
+if (typeof providers_1.DAI_OPTIMISM_SEPOLIA === 'undefined') {
+  providers_1.DAI_OPTIMISM_SEPOLIA = undefined;
+}
+if (typeof providers_1.USDC_OPTIMISM_SEPOLIA === 'undefined') {
+  providers_1.USDC_OPTIMISM_SEPOLIA = undefined;
+}
+if (typeof providers_1.USDT_OPTIMISM_SEPOLIA === 'undefined') {
+  providers_1.USDT_OPTIMISM_SEPOLIA = undefined;
+}
+if (typeof providers_1.WBTC_OPTIMISM_SEPOLIA === 'undefined') {
+  providers_1.WBTC_OPTIMISM_SEPOLIA = undefined;
+}`);
         }
         
-        const safePattern = /\[ChainId\.OPTIMISM_SEPOLIA\]:\s*\[[\s\S]*?DAI_OPTIMISM_SEPOLIA[\s\S]*?\],/;
-        const safeReplacement = `[ChainId.OPTIMISM_SEPOLIA]: [
-        // PATCHED: Safe token list for KAIA chain
-        ...(DAI_OPTIMISM_SEPOLIA ? [DAI_OPTIMISM_SEPOLIA] : []),
-        ...(USDC_OPTIMISM_SEPOLIA ? [USDC_OPTIMISM_SEPOLIA] : []),
-        ...(USDT_OPTIMISM_SEPOLIA ? [USDT_OPTIMISM_SEPOLIA] : []),
-        ...(WBTC_OPTIMISM_SEPOLIA ? [WBTC_OPTIMISM_SEPOLIA] : []),
-    ],`;
+        // Replace the OPTIMISM_SEPOLIA array with safe version
+        const safePattern = /\[sdk_core_1\.ChainId\.OPTIMISM_SEPOLIA\]:\s*\[([^\]]+)\]/;
+        const safeReplacement = `[sdk_core_1.ChainId.OPTIMISM_SEPOLIA]: [
+        // PATCHED: Safe token list for KAIA chain - filters out undefined tokens
+        ...(providers_1.DAI_OPTIMISM_SEPOLIA ? [providers_1.DAI_OPTIMISM_SEPOLIA] : []),
+        ...(providers_1.USDC_OPTIMISM_SEPOLIA ? [providers_1.USDC_OPTIMISM_SEPOLIA] : []),
+        ...(providers_1.USDT_OPTIMISM_SEPOLIA ? [providers_1.USDT_OPTIMISM_SEPOLIA] : []),
+        ...(providers_1.WBTC_OPTIMISM_SEPOLIA ? [providers_1.WBTC_OPTIMISM_SEPOLIA] : []),
+    ]`;
         
         let patched = content.replace(safePattern, safeReplacement);
         
@@ -89,6 +100,34 @@ const WBTC_OPTIMISM_SEPOLIA = _providers.WBTC_OPTIMISM_SEPOLIA;`);
         }
         
         return patched;
+      }
+      return content;
+    }
+  },
+  {
+    path: 'node_modules/@uniswap/smart-order-router/build/main/providers/token-provider.js',
+    patch: (content) => {
+      // Patch token-provider to export undefined for problematic tokens
+      if (content.includes('DAI_OPTIMISM_SEPOLIA') && !content.includes('// PATCHED for KAIA')) {
+        // Replace token assignments with undefined for OPTIMISM_SEPOLIA tokens
+        const tokenPatterns = [
+          [/exports\.DAI_OPTIMISM_SEPOLIA\s*=\s*new[^;]+;/g, 'exports.DAI_OPTIMISM_SEPOLIA = undefined; // PATCHED for KAIA chain'],
+          [/exports\.USDC_OPTIMISM_SEPOLIA\s*=\s*new[^;]+;/g, 'exports.USDC_OPTIMISM_SEPOLIA = undefined; // PATCHED for KAIA chain'],
+          [/exports\.USDT_OPTIMISM_SEPOLIA\s*=\s*new[^;]+;/g, 'exports.USDT_OPTIMISM_SEPOLIA = undefined; // PATCHED for KAIA chain'],
+          [/exports\.WBTC_OPTIMISM_SEPOLIA\s*=\s*new[^;]+;/g, 'exports.WBTC_OPTIMISM_SEPOLIA = undefined; // PATCHED for KAIA chain'],
+        ];
+        
+        let patched = content;
+        tokenPatterns.forEach(([pattern, replacement]) => {
+          patched = patched.replace(pattern, replacement);
+        });
+        
+        if (patched !== content) {
+          if (!patched.includes('// PATCHED for KAIA chain')) {
+            patched = '// PATCHED for KAIA chain - token constants set to undefined\n' + patched;
+          }
+          return patched;
+        }
       }
       return content;
     }

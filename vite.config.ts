@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import path from 'path';
+import { tokenListsStubPlugin } from './lib/vite-token-lists-plugin';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -21,6 +22,7 @@ export default defineConfig({
       // Exclude modules that don't need polyfills
       exclude: ['fs', 'net', 'tls'],
     }),
+    tokenListsStubPlugin(),
   ],
   resolve: {
     alias: [
