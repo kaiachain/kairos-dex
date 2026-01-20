@@ -14,6 +14,8 @@ export default defineConfig({
         global: true,
         process: true,
       },
+      // Explicitly include stream polyfills
+      include: ['stream', 'stream-browserify', 'readable-stream'],
       // Include polyfills for CommonJS support
       protocolImports: true,
       // Exclude modules that don't need polyfills
@@ -49,106 +51,188 @@ export default defineConfig({
     'Browser': 'undefined',
   },
   optimizeDeps: {
+    // Include CommonJS modules in optimizeDeps to handle CommonJS properly
+    // These need to be pre-bundled with proper CommonJS interop
+    // Common crypto/hash/blockchain libraries used by @ethersproject and @uniswap
     include: [
-      '@uniswap/v3-sdk',
-      '@uniswap/sdk-core',
-      // Include router to pre-bundle and convert CommonJS to ESM
+      'bn.js',
+      'bignumber.js',
+      'js-sha3',
+      'hash.js',
+      'bech32',
+      'toformat',
+      // Include @uniswap/smart-order-router to transform CommonJS require() calls
+      // This ensures require() is transformed to ESM imports
       '@uniswap/smart-order-router',
       '@uniswap/smart-order-router/build/main',
     ],
     exclude: [
       'brotli',
+      // Exclude other @ethersproject and @uniswap packages from pre-bundling
+      // Let them be bundled normally during build to avoid TDZ issues
+      // Note: @uniswap/smart-order-router is now included above to fix require() errors
+      '@ethersproject/providers',
+      '@ethersproject/address',
+      '@ethersproject/contracts',
+      '@uniswap/v3-sdk',
+      '@uniswap/sdk-core',
     ],
     esbuildOptions: {
       define: {
         global: 'globalThis',
       },
-      // Enable tree-shaking in optimizeDeps
-      treeShaking: true,
+      // Disable tree-shaking in optimizeDeps to avoid TDZ issues
+      treeShaking: false,
+      // Ensure proper initialization order
+      keepNames: true,
     },
-    // Force re-optimization if needed
-    force: false,
+    // Force re-optimization to rebuild deps with new settings
+    // Set to false after first successful build
+    force: true,
   },
   build: {
-    // Use esbuild for faster builds (default, faster than terser)
-    // For better minification, can switch to 'terser' but requires terser package
-    minify: 'esbuild',
+    // Completely disable minification to avoid TDZ errors
+    // Minification can cause "Cannot access 'X' before initialization" errors
+    // We can re-enable later once TDZ issues are fully resolved
+    minify: false,
+    // Minification options (disabled - minify is false)
+    // esbuild: {
+    //   keepNames: true,
+    //   legalComments: 'none',
+    //   minifyIdentifiers: false,
+    //   minifySyntax: false,
+    //   minifyWhitespace: false,
+    // },
     // Aggressive minification options
-    target: 'es2015', // Target modern browsers for smaller bundles
+    target: 'es2020', // Target modern browsers (ES2020 needed for BigInt literals)
     // Disable sourcemaps for production to reduce bundle size
     sourcemap: false,
     // Report compressed size (can disable to speed up builds)
     reportCompressedSize: true,
+    // CommonJS options to handle circular dependencies better
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+      // Ensure proper require order to avoid TDZ issues
+      strictRequires: false,
+      // Handle circular dependencies - use 'namespace' for @ethersproject
+      requireReturnsDefault: (id) => {
+        // Use 'namespace' for @ethersproject to avoid TDZ issues
+        if (id.includes('@ethersproject/')) {
+          return 'namespace';
+        }
+        // Handle CommonJS modules that don't have default exports
+        // These libraries are imported as default but are CommonJS modules
+        // Common crypto/hash/blockchain libraries used by @ethersproject and @uniswap
+        const commonJsCryptoModules = [
+          'bn.js',
+          'bignumber.js',
+          'js-sha3',
+          'hash.js',
+          'bech32',
+          'toformat',
+        ];
+        if (commonJsCryptoModules.some(module => id.includes(module))) {
+          return 'preferred'; // This allows both default and named imports
+        }
+        return 'auto';
+      },
+      // Use default export mode for better compatibility
+      defaultIsModuleExports: 'auto',
+    },
     // Aggressive tree-shaking
     rollupOptions: {
       treeshake: {
-        moduleSideEffects: false,
+        moduleSideEffects: (id) => {
+          // Preserve side effects for problematic modules
+          if (id.includes('@uniswap/') || id.includes('@ethersproject/')) {
+            return true;
+          }
+          return 'no-external';
+        },
         propertyReadSideEffects: false,
         tryCatchDeoptimization: false,
       },
       output: {
+        // Don't hoist transitive imports - can cause TDZ with circular deps
+        hoistTransitiveImports: false,
+        // Don't preserve modules - causes too many files
+        preserveModules: false,
+        // Don't use compact output - can cause initialization order issues
+        compact: false,
+        // Use ES module format for better circular dependency handling
+        format: 'es',
+        // Don't preserve entry signatures - allows more flexibility in bundling
+        preserveEntrySignatures: false,
+        // Use 'compat' interop for better CommonJS handling, especially for bn.js
+        // 'compat' ensures CommonJS modules work properly with ESM imports
+        interop: 'compat',
+        // Don't inline dynamic imports - let them be separate chunks
+        inlineDynamicImports: false,
+        // Ensure proper chunk loading order
+        generatedCode: {
+          // Use const/let instead of var to avoid hoisting issues
+          constBindings: true,
+          // Preserve object shorthand to avoid transformation issues
+          objectShorthand: false,
+          // Use arrow functions to avoid 'this' binding issues
+          arrowFunctions: false,
+        },
         manualChunks: (id) => {
           // Only chunk node_modules, skip source files
           if (!id.includes('node_modules')) {
             return;
           }
           
-          // React and core libraries (must come first to avoid circular deps)
+          // React ecosystem - inline React into main bundle
+          // This ensures React is always available when other chunks load
+          // React and ReactDOM are small enough to inline
           if (
             id.includes('node_modules/react/') ||
             id.includes('node_modules/react-dom/') ||
-            id.includes('node_modules/react-router/') ||
             id.includes('node_modules/scheduler/')
           ) {
-            return 'react-vendor';
+            return; // Inline into main bundle - ensures React is available
           }
           
-          // React Query (depends on React)
-          if (id.includes('node_modules/@tanstack/react-query/')) {
-            return 'react-query-vendor';
-          }
-          
-          // Wagmi (depends on React Query) - check before viem to avoid cycles
-          if (id.includes('node_modules/wagmi/') && !id.includes('node_modules/wagmi/node_modules')) {
-            return 'wagmi-vendor';
-          }
-          
-          // Viem (separate from wagmi to avoid circular deps)
-          if (id.includes('node_modules/viem/') && !id.includes('node_modules/viem/node_modules')) {
-            return 'viem-vendor';
-          }
-          
-          // Wallet libraries (large, can be lazy-loaded)
+          // React ecosystem - inline React libraries that depend on React
+          // This ensures they have access to the same React instance
           if (
+            id.includes('node_modules/react-router/') ||
+            id.includes('node_modules/@tanstack/react-query/')
+          ) {
+            return; // Inline into main bundle - ensures same React instance
+          }
+          
+          // Web3 ecosystem - inline ALL web3 packages into main bundle
+          // This avoids TDZ errors from chunking circular dependencies
+          // Also ensures React is available when wagmi tries to use it
+          if (
+            id.includes('node_modules/wagmi/') ||
+            id.includes('node_modules/viem/') ||
+            id.includes('node_modules/@wagmi/') ||
             id.includes('node_modules/@coinbase/') ||
             id.includes('node_modules/@walletconnect/') ||
-            id.includes('node_modules/@web3modal/')
+            id.includes('node_modules/@web3modal/') ||
+            id.includes('node_modules/ox/') ||
+            id.includes('node_modules/abitype/')
           ) {
-            return 'wallet-vendor';
+            return; // Inline into main bundle - avoids TDZ and ensures React is available
           }
           
-          // Wagmi connectors and core (separate from main wagmi)
-          if (
-            id.includes('node_modules/@wagmi/core/') ||
-            id.includes('node_modules/@wagmi/connectors/')
-          ) {
-            return 'wagmi-connectors-vendor';
+          // DeFi ecosystem - inline both @ethersproject and @uniswap to avoid TDZ
+          // The TDZ issue is caused by chunking these packages together
+          // Inlining them into the main bundle avoids the circular dependency bundling issue
+          const isEthersProject = id.includes('node_modules/@ethersproject/');
+          const isUniswap = id.includes('node_modules/@uniswap/');
+          
+          // Don't chunk either - let them be in the main bundle
+          // This avoids TDZ issues from chunking circular dependencies
+          if (isEthersProject || isUniswap) {
+            return; // Don't chunk, goes to main bundle
           }
           
-          // Uniswap SDK (large, standalone)
-          if (id.includes('node_modules/@uniswap/')) {
-            return 'uniswap-vendor';
-          }
-          
-          // Ethers (used by router, large)
-          if (
-            id.includes('node_modules/@ethersproject/') ||
-            (id.includes('node_modules/ethers/') && !id.includes('node_modules/ethers/node_modules'))
-          ) {
-            return 'ethers-vendor';
-          }
-          
-          // GraphQL (standalone)
+          // GraphQL (standalone, can be lazy-loaded)
           if (
             id.includes('node_modules/graphql/') ||
             id.includes('node_modules/graphql-request/')
@@ -156,7 +240,17 @@ export default defineConfig({
             return 'graphql-vendor';
           }
           
-          // Crypto/encoding libraries
+          // UI libraries - inline ALL React-dependent libraries to ensure React is available
+          // All of these use React, so they need to be in the same bundle
+          if (
+            id.includes('node_modules/react-toastify/') ||
+            id.includes('node_modules/lucide-react/') ||
+            id.includes('node_modules/recharts/')
+          ) {
+            return; // Inline into main bundle - needs React
+          }
+          
+          // Crypto/encoding utilities
           if (
             id.includes('node_modules/jsbi/') ||
             id.includes('node_modules/base64-') ||
@@ -165,45 +259,18 @@ export default defineConfig({
             return 'crypto-vendor';
           }
           
-          // Node polyfills (vm-browserify, buffer, stream, util)
-          if (
-            id.includes('node_modules/vm-browserify/') ||
-            id.includes('node_modules/buffer/') ||
-            id.includes('node_modules/stream-') ||
-            id.includes('node_modules/util/') ||
-            id.includes('node_modules/process/')
-          ) {
-            return 'polyfills-vendor';
-          }
-          
-          // UI libraries
-          if (
-            id.includes('node_modules/lucide-react/') ||
-            id.includes('node_modules/react-toastify/') ||
-            id.includes('node_modules/recharts/')
-          ) {
-            return 'ui-vendor';
-          }
-          
-          // Utility libraries (small, commonly used)
+          // Small utility libraries (commonly used, keep together)
           if (
             id.includes('node_modules/clsx/') ||
-            id.includes('node_modules/tailwind-merge/') ||
-            id.includes('node_modules/zustand/')
+            id.includes('node_modules/tailwind-merge/')
           ) {
             return 'utils-vendor';
           }
           
-          // Shared/common dependencies that might cause circular deps
-          // Put these in a separate chunk to break cycles
-          if (
-            id.includes('node_modules/ox/') ||
-            id.includes('node_modules/abitype/')
-          ) {
-            return 'shared-vendor';
-          }
+          // Note: Polyfills are included in vendor chunk to avoid circular dependencies
+          // The vite-plugin-node-polyfills handles the polyfill injection automatically
           
-          // Other vendor libraries (catch-all, but smaller now)
+          // Everything else goes into vendor chunk (including polyfills)
           return 'vendor';
         },
       },

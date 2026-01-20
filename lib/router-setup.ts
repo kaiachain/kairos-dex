@@ -6,7 +6,6 @@
 import { Token, CurrencyAmount, ChainId } from '@uniswap/sdk-core';
 import { Provider } from '@ethersproject/providers';
 import JSBI from 'jsbi';
-import { ethers } from 'ethers';
 import { CONTRACT_V3_CORE_FACTORY, CONTRACT_QUOTER_V2 } from '@/config/env';
 
 export function TokenAmount(token: Token, rawAmount: string | bigint) {

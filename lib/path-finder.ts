@@ -8,6 +8,13 @@ import { query } from './graphql';
 import { GET_POOLS_QUERY } from './graphql-queries';
 import { SubgraphPoolsResponse, SubgraphPool } from '@/types/subgraph';
 import { getAddress } from '@ethersproject/address';
+import { CONTRACTS } from '@/config/contracts';
+import { QuoterV2_ABI } from '@/abis/QuoterV2';
+import { SwapRouter02_ABI } from '@/abis/SwapRouter02';
+import { parseUnits, formatUnits } from '@/lib/utils';
+import { Contract } from '@ethersproject/contracts';
+import { JsonRpcProvider } from '@ethersproject/providers';
+import { RPC_URL } from '@/config/env';
 
 interface PoolConnection {
   poolAddress: string;
@@ -257,13 +264,6 @@ export async function calculateMultiHopQuote(
   path: PoolConnection[]; // Store path for execution
 } | null> {
   try {
-    const { CONTRACTS } = require('@/config/contracts');
-    const { QuoterV2_ABI } = require('@/abis/QuoterV2');
-    const { parseUnits, formatUnits } = require('@/lib/utils');
-    const { Contract } = require('@ethersproject/contracts');
-    const { JsonRpcProvider } = require('@ethersproject/providers');
-    const { RPC_URL } = require('@/config/env');
-    
     const ethersProvider = new JsonRpcProvider(RPC_URL);
     const quoterContract = new Contract(CONTRACTS.QuoterV2, QuoterV2_ABI, ethersProvider);
     
@@ -378,14 +378,6 @@ export async function buildMultiHopSwapCalldata(
   value: string;
 } | null> {
   try {
-    const { CONTRACTS } = require('@/config/contracts');
-    const { SwapRouter02_ABI } = require('@/abis/SwapRouter02');
-    const { parseUnits } = require('@/lib/utils');
-    const { Contract } = require('@ethersproject/contracts');
-    const { JsonRpcProvider } = require('@ethersproject/providers');
-    const { RPC_URL } = require('@/config/env');
-    const { getAddress } = require('@ethersproject/address');
-    
     const ethersProvider = new JsonRpcProvider(RPC_URL);
     const routerContract = new Contract(CONTRACTS.SwapRouter02, SwapRouter02_ABI, ethersProvider);
     
