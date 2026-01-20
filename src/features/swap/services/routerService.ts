@@ -399,7 +399,7 @@ export async function getRouterRoute(
             ? Math.abs(cachedOptions.deadline - currentDeadline) < 300 // Within 5 minutes
             : false;
           const slippageClose = cachedOptions.slippageTolerance
-            ? Math.abs(cachedOptions.slippageTolerance.numerator - currentSlippage.numerator) < 10
+            ? Math.abs(Number(cachedOptions.slippageTolerance.numerator) - Number(currentSlippage.numerator)) < 10
             : false;
           
           // If all parameters match closely, we can reuse methodParameters directly (INSTANT!)
