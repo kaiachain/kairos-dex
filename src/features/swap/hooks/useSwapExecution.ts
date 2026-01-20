@@ -15,6 +15,7 @@ import { JsonRpcProvider } from '@ethersproject/providers';
 import { RPC_URL } from '@/config/env';
 import { getRouterRoute } from '@/features/swap/hooks/useSwapQuote';
 import { addStatusMessage } from '@/app/providers/contexts/SwapStatusContext';
+import { getCachedQuote, getCacheKey } from '@/features/swap/utils/quoteCache';
 
 export interface SwapExecutionState {
   needsApproval: boolean;
@@ -435,19 +436,96 @@ export function useSwapExecution({
       const provider = new JsonRpcProvider(RPC_URL);
 
       addStatusMessage('info', 'Preparing swap execution...', `Slippage: ${slippage}%, Deadline: ${deadline}min`);
-      console.log('Getting route from Smart Order Router...');
-      // Always use Smart Order Router for execution - it handles all cases properly
-      // including multi-hop routes, slippage, gas estimation, and multicall encoding
-      const routeResult = await getRouterRoute(
-        tokenIn,
-        tokenOut,
-        amountIn,
-        slippage,
-        deadline,
-        address,
-        provider,
-        cachedRoute // Pass cached route - router may optimize if possible
-      );
+      
+      // Try to use cached route first to avoid refetching
+      let routeResult: { route: any; methodParameters: any; quote: any } | null = null;
+      
+      if (cachedRoute?.route) {
+        console.log('Using cached route for execution...');
+        addStatusMessage('info', 'Using cached route', 'Regenerating methodParameters with your settings...');
+        
+        // Use cached route and regenerate methodParameters with user's slippage/deadline
+        routeResult = await getRouterRoute(
+          tokenIn,
+          tokenOut,
+          amountIn,
+          slippage,
+          deadline,
+          address,
+          provider,
+          cachedRoute // Pass cached route - router will reuse it and regenerate methodParameters
+        );
+      }
+      
+      // If cached route didn't work or wasn't available, wait briefly for background fetch
+      if (!routeResult || !routeResult.methodParameters) {
+        // Check cache again - route might have been fetched in background
+        const cacheKey = getCacheKey(tokenIn, tokenOut, amountIn);
+        const cached = getCachedQuote(cacheKey);
+        
+        if (cached?.routeResult?.route) {
+          console.log('Found route in cache after brief wait, using it...');
+          addStatusMessage('info', 'Using cached route', 'Route was being prepared in background');
+          routeResult = await getRouterRoute(
+            tokenIn,
+            tokenOut,
+            amountIn,
+            slippage,
+            deadline,
+            address,
+            provider,
+            cached.routeResult // Use the cached route
+          );
+        }
+      }
+      
+      // If still no route, wait a bit more for background fetch (max 3 seconds)
+      if (!routeResult || !routeResult.methodParameters) {
+        console.log('Waiting briefly for route to be ready...');
+        addStatusMessage('info', 'Waiting for route...', 'Route is being prepared');
+        
+        // Wait up to 3 seconds, checking cache every 500ms
+        for (let i = 0; i < 6; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const cacheKey2 = getCacheKey(tokenIn, tokenOut, amountIn);
+          const cached2 = getCachedQuote(cacheKey2);
+          
+          if (cached2?.routeResult?.route) {
+            console.log('Found route in cache after waiting, using it...');
+            addStatusMessage('info', 'Using cached route', 'Route ready');
+            routeResult = await getRouterRoute(
+              tokenIn,
+              tokenOut,
+              amountIn,
+              slippage,
+              deadline,
+              address,
+              provider,
+              cached2.routeResult
+            );
+            if (routeResult?.methodParameters) {
+              break; // Success, exit loop
+            }
+          }
+        }
+      }
+      
+      // If cached route still not available, fetch fresh
+      if (!routeResult || !routeResult.methodParameters) {
+        console.log('Cached route not available, fetching fresh route...');
+        addStatusMessage('loading', 'Getting route from Smart Order Router...', 'This may take a few seconds');
+        routeResult = await getRouterRoute(
+          tokenIn,
+          tokenOut,
+          amountIn,
+          slippage,
+          deadline,
+          address,
+          provider,
+          undefined // No cached route
+        );
+      }
 
       if (!routeResult || !routeResult.methodParameters) {
         addStatusMessage('error', 'No route found', 'Please try again or check token pair');
@@ -457,7 +535,7 @@ export function useSwapExecution({
         return;
       }
 
-      console.log(`Route found: ${routeResult.quote.toExact()} ${tokenOut.symbol}`);
+      console.log(`Route ready: ${routeResult.quote.toExact()} ${tokenOut.symbol}`);
       addStatusMessage('success', `Route ready: ${routeResult.quote.toExact()} ${tokenOut.symbol}`, 'MethodParameters generated');
 
       setIsPreparingSwap(false);

@@ -7,6 +7,7 @@ import { SwapButton } from './SwapButton';
 import { SwapSettings } from './SwapSettings';
 import { PriceInfo } from './PriceInfo';
 import { TerminalStatus } from './TerminalStatus';
+import { QuoteTimer } from './QuoteTimer';
 import { ArrowDownUp, Loader2, AlertCircle, X } from 'lucide-react';
 import { useSwapQuote } from '@/features/swap/hooks/useSwapQuote';
 import { useTokenBalance } from '@/shared/hooks/useTokenBalance';
@@ -48,7 +49,7 @@ export function SwapInterface() {
 
   const { data: balanceIn, refetch: refetchBalanceIn } = useTokenBalance(tokenIn);
   const { data: balanceOut, refetch: refetchBalanceOut } = useTokenBalance(tokenOut);
-  const { data: quote, isLoading: isQuoteLoading, error: quoteError, getCachedRoute } = useSwapQuote(
+  const { data: quote, isLoading: isQuoteLoading, error: quoteError, getCachedRoute, quoteTimestamp } = useSwapQuote(
     tokenIn,
     tokenOut,
     amountIn
@@ -499,13 +500,21 @@ export function SwapInterface() {
 
         {/* Price Info */}
         {showPriceInfo && quote && tokenIn && tokenOut && !quoteError && (
-          <PriceInfo
-            quote={quote}
-            tokenIn={tokenIn}
-            tokenOut={tokenOut}
-            slippage={slippage}
-            amountIn={amountIn}
-          />
+          <div className="space-y-2">
+            <PriceInfo
+              quote={quote}
+              tokenIn={tokenIn}
+              tokenOut={tokenOut}
+              slippage={slippage}
+              amountIn={amountIn}
+            />
+            {/* Quote Expiration Timer */}
+            {quoteTimestamp && (
+              <div className="flex justify-end">
+                <QuoteTimer timestamp={quoteTimestamp} expirationTime={60000} />
+              </div>
+            )}
+          </div>
         )}
 
         {/* Swap Button */}

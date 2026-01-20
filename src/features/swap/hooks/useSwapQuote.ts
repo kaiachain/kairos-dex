@@ -4,7 +4,7 @@
  * Optimized with debouncing, caching, and stale-while-revalidate pattern
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { usePublicClient } from "wagmi";
 import { Token } from "@/shared/types/token";
@@ -47,6 +47,9 @@ export function useSwapQuote(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [staleQuote, setStaleQuote] = useState<SwapQuote | null>(null);
+  const [quoteTimestamp, setQuoteTimestamp] = useState<number | null>(null);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const expirationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const publicClient = usePublicClient();
 
   // Create provider from publicClient (only on client side)
@@ -87,6 +90,31 @@ export function useSwapQuote(
       setQuote(cached.quote);
       setIsLoading(false);
       setError(null);
+      setQuoteTimestamp(cached.timestamp);
+      
+      // Set expiration timer for cached quote
+      if (expirationTimerRef.current) {
+        clearTimeout(expirationTimerRef.current);
+      }
+      
+      const timeSinceCache = Date.now() - cached.timestamp;
+      const timeUntilExpiration = 60000 - timeSinceCache; // 60 seconds total
+      
+        if (timeUntilExpiration > 0) {
+        expirationTimerRef.current = setTimeout(() => {
+          console.log('⏰ Cached quote expired, refetching...');
+          addStatusMessage('info', 'Quote expired', 'Refetching fresh quote...');
+          // Trigger refetch by incrementing refetch trigger
+          setRefetchTrigger(prev => prev + 1);
+          setQuoteTimestamp(null);
+        }, timeUntilExpiration);
+      } else {
+        // Quote already expired, trigger refetch immediately
+        console.log('⏰ Cached quote already expired, refetching...');
+        setRefetchTrigger(prev => prev + 1);
+        setQuoteTimestamp(null);
+      }
+      
       return;
     }
 
@@ -150,6 +178,48 @@ export function useSwapQuote(
                 route: null,
                 routePath: [tokenIn.address.toLowerCase(), tokenOut.address.toLowerCase()],
               };
+              
+              // IMPORTANT: Also fetch route from router for execution
+              // We fetch it in parallel (non-blocking) so quote shows immediately
+              // but route will be cached when ready for execution
+              if (provider && !cancelled) {
+                console.log('Fetching route from router for execution (in background)...');
+                addStatusMessage('info', 'Preparing route for execution...', 'Getting route data');
+                
+                // Fetch route in parallel - don't block showing the quote
+                // But we'll cache it when ready so execution can use it
+                getQuoteFromRouter(tokenIn, tokenOut, debouncedAmountIn, provider)
+                  .then((routerQuote) => {
+                    if (routerQuote && !cancelled && !abortController?.signal.aborted) {
+                      console.log('✅ Route fetched for execution, updating cache...');
+                      // Store the full route in quoteResult so it gets cached properly
+                      const routeResultForCache = routerQuote.fullRoute 
+                        ? { route: routerQuote.fullRoute }
+                        : (routerQuote.route ? { route: routerQuote.route } : null);
+                      
+                      if (routeResultForCache) {
+                        // Update cache with route - use the same cache key
+                        const currentCacheKey = getCacheKey(tokenIn, tokenOut, debouncedAmountIn);
+                        const currentCached = getCachedQuote(currentCacheKey);
+                        if (currentCached) {
+                          // Update cache with route
+                          setCachedQuote(currentCacheKey, currentCached.quote, routeResultForCache);
+                          console.log('✅ Cache updated with route - ready for execution');
+                        } else {
+                          // Cache expired or cleared, but we can still store it
+                          // We'll need to get the quote again, but for now store the route
+                          const tempQuote = transformQuoteResult(quoteResult, tokenIn, tokenOut, debouncedAmountIn);
+                          setCachedQuote(currentCacheKey, tempQuote, routeResultForCache);
+                        }
+                      }
+                    }
+                  })
+                  .catch((routeError) => {
+                    if (!cancelled && !abortController?.signal.aborted) {
+                      console.log('Route fetch for execution failed (will fetch on swap):', routeError);
+                    }
+                  });
+              }
             }
           } catch (fastQuoteError) {
             console.log('Fast quote failed, will try router:', fastQuoteError);
@@ -204,8 +274,11 @@ export function useSwapQuote(
           routeLength: newQuote.route?.length || 0,
         });
 
-        // Cache the quote
-        setCachedQuote(cacheKey, newQuote, quoteResult.route ? { route: quoteResult.route } : null);
+        // Cache the quote with full route result for execution
+        const routeResultForCache = quoteResult.fullRoute 
+          ? { route: quoteResult.fullRoute }
+          : (quoteResult.route ? { route: quoteResult.route } : null);
+        setCachedQuote(cacheKey, newQuote, routeResultForCache);
 
         if (cancelled || abortController?.signal.aborted) {
           console.log('⚠️ Quote fetch cancelled or aborted');
@@ -215,6 +288,21 @@ export function useSwapQuote(
         console.log('✅ Setting quote in state');
         setQuote(newQuote);
         setStaleQuote(null);
+        setQuoteTimestamp(Date.now());
+        
+        // Clear any existing expiration timer
+        if (expirationTimerRef.current) {
+          clearTimeout(expirationTimerRef.current);
+        }
+        
+        // Set expiration timer to auto-refetch after 60 seconds
+        expirationTimerRef.current = setTimeout(() => {
+          console.log('⏰ Quote expired, refetching...');
+          addStatusMessage('info', 'Quote expired', 'Refetching fresh quote...');
+          // Trigger refetch by incrementing refetch trigger
+          setRefetchTrigger(prev => prev + 1);
+          setQuoteTimestamp(null);
+        }, 60000); // 60 seconds
       } catch (err) {
         if (cancelled || abortController?.signal.aborted) return;
         console.error("Error fetching swap quote:", err);
@@ -238,8 +326,20 @@ export function useSwapQuote(
       if (abortController) {
         abortController.abort();
       }
+      if (expirationTimerRef.current) {
+        clearTimeout(expirationTimerRef.current);
+      }
     };
-  }, [tokenIn, tokenOut, debouncedAmountIn, provider, publicClient, quote, staleQuote]);
+  }, [tokenIn, tokenOut, debouncedAmountIn, provider, publicClient, refetchTrigger]);
+  
+  // Cleanup expiration timer on unmount
+  useEffect(() => {
+    return () => {
+      if (expirationTimerRef.current) {
+        clearTimeout(expirationTimerRef.current);
+      }
+    };
+  }, []);
 
   // Return stale quote if loading and stale quote exists (stale-while-revalidate)
   const displayQuote = isLoading && staleQuote ? staleQuote : quote;
@@ -248,6 +348,7 @@ export function useSwapQuote(
     data: displayQuote, 
     isLoading, 
     error,
+    quoteTimestamp, // Expose timestamp for timer
     // Expose function to get cached route for execution
     getCachedRoute: () => {
       if (!tokenIn || !tokenOut || !debouncedAmountIn) return null;

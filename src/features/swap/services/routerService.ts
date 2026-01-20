@@ -19,6 +19,7 @@ export interface RouterQuoteResult {
   poolAddress: string;
   route: any;
   routePath: string[];
+  fullRoute?: any; // Store full route object with methodParameters for execution
 }
 
 // Convert app Token to SDK Token
@@ -218,7 +219,7 @@ export async function getQuoteFromRouter(
     const rawTokenAmountIn = fromReadableAmount(parseFloat(amountIn), tokenIn.decimals || 18);
     const amountInCurrency = TokenAmount(sdkTokenIn, rawTokenAmountIn.toString());
 
-    const options = {
+    const defaultOptions = {
       recipient: "0x0000000000000000000000000000000000000000",
       slippageTolerance: new Percent(50, 10_000), // 0.5% default
       deadline: Math.floor(Date.now() / 1000) + 60 * 20,
@@ -229,7 +230,7 @@ export async function getQuoteFromRouter(
     addStatusMessage('loading', 'Smart Order Router: Finding route...', 'Exploring pools and paths');
     const startTime = Date.now();
     
-    const routePromise = router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, options);
+    const routePromise = router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, defaultOptions);
     const timeoutPromise = new Promise<never>((_, reject) => 
       setTimeout(() => reject(new Error('Quote request timeout after 20 seconds')), 20000)
     );
@@ -320,6 +321,15 @@ export async function getQuoteFromRouter(
         pools: route.route?.[0]?.pools?.length || route.trade?.routes?.[0]?.route?.pools?.length || 0,
       });
 
+      // Attach options to route for later comparison (so we can reuse methodParameters)
+      if (route) {
+        route.options = {
+          recipient: defaultOptions.recipient,
+          slippageTolerance: defaultOptions.slippageTolerance,
+          deadline: defaultOptions.deadline,
+        };
+      }
+      
       return {
         amountOut,
         fee,
@@ -327,6 +337,7 @@ export async function getQuoteFromRouter(
         poolAddress,
         route: route.route,
         routePath,
+        fullRoute: route, // Store full route object with methodParameters for execution
       };
     } catch (quoteExtractionError: any) {
       console.error("❌ Error during quote extraction:", quoteExtractionError);
@@ -368,11 +379,78 @@ export async function getRouterRoute(
     if (cachedRoute?.route) {
       const cachedRouteObj = cachedRoute.route;
       const cachedAmountIn = cachedRouteObj.trade?.inputAmount;
-      
       const sdkTokenIn = tokenToSDKToken(tokenIn);
       const rawTokenAmountIn = fromReadableAmount(parseFloat(amountIn), tokenIn.decimals || 18);
       const amountInCurrency = TokenAmount(sdkTokenIn, rawTokenAmountIn.toString());
       
+      // Check if amount matches
+      if (cachedAmountIn && cachedAmountIn.toExact() === amountInCurrency.toExact()) {
+        // Check if cached route has methodParameters we can potentially reuse
+        if (cachedRouteObj.methodParameters) {
+          // Check if we can reuse methodParameters directly
+          // MethodParameters include recipient and deadline, so we need to check those
+          const cachedOptions = cachedRouteObj.options || {};
+          const currentDeadline = Math.floor(Date.now() / 1000) + 60 * deadlineMinutes;
+          const currentSlippage = new Percent(Math.floor(slippageTolerance * 100), 10_000);
+          
+          // Check if recipient, slippage, and deadline are close enough to reuse
+          const recipientMatches = cachedOptions.recipient === recipient;
+          const deadlineClose = cachedOptions.deadline 
+            ? Math.abs(cachedOptions.deadline - currentDeadline) < 300 // Within 5 minutes
+            : false;
+          const slippageClose = cachedOptions.slippageTolerance
+            ? Math.abs(cachedOptions.slippageTolerance.numerator - currentSlippage.numerator) < 10
+            : false;
+          
+          // If all parameters match closely, we can reuse methodParameters directly (INSTANT!)
+          if (recipientMatches && deadlineClose && slippageClose) {
+            console.log(`✅ Reusing cached methodParameters directly - INSTANT (no router call)`);
+            addStatusMessage('success', 'Using cached methodParameters', 'Instant - no refetch needed');
+            return {
+              route: cachedRouteObj,
+              methodParameters: cachedRouteObj.methodParameters,
+              quote: cachedRouteObj.quote,
+            };
+          }
+          
+          // If only recipient changed, we still need to regenerate (but should be faster)
+          console.log(`⚠️ Parameters changed, regenerating methodParameters...`);
+        }
+        
+        // Regenerate methodParameters with new parameters
+        console.log(`Regenerating methodParameters with updated settings...`);
+        addStatusMessage('info', 'Updating methodParameters...', 'Using cached route (should be fast)');
+        
+        const routerModule = await import("@uniswap/smart-order-router/build/main");
+        const SwapType = routerModule.SwapType;
+        
+        const options = {
+          recipient,
+          slippageTolerance: new Percent(Math.floor(slippageTolerance * 100), 10_000),
+          deadline: Math.floor(Date.now() / 1000) + 60 * deadlineMinutes,
+          type: SwapType?.SWAP_ROUTER_02 ?? 1,
+        };
+        
+        const router = await getRouterInstance(provider);
+        const sdkTokenOut = tokenToSDKToken(tokenOut);
+        
+        const startTime = Date.now();
+        const route = await router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, options);
+        const duration = Date.now() - startTime;
+        
+        if (route && route.methodParameters) {
+          console.log(`✅ Regenerated methodParameters in ${duration}ms`);
+          addStatusMessage('success', `Ready in ${duration}ms`, 'MethodParameters updated');
+          return {
+            route,
+            methodParameters: route.methodParameters,
+            quote: route.quote,
+          };
+        }
+      }
+      
+      // Fallback: Try to use cached route even without methodParameters
+      // Variables already declared above, just check if amount matches
       if (cachedAmountIn && cachedAmountIn.toExact() === amountInCurrency.toExact()) {
         console.log(`Reusing cached route for execution...`);
         addStatusMessage('info', 'Found cached route', 'Regenerating methodParameters...');

@@ -11,7 +11,7 @@ export interface CachedQuote {
   routeResult: any; // Store full route result for execution
 }
 
-const QUOTE_CACHE_TTL = 5000; // 5 seconds
+const QUOTE_CACHE_TTL = 60000; // 60 seconds - quotes expire after 1 minute
 const quoteCache = new Map<string, CachedQuote>();
 
 /**

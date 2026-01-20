@@ -6,6 +6,7 @@
  */
 export * from './SwapInterface';
 export * from './SwapButton';
+export * from './QuoteTimer';
 // SwapConfirmation is dynamically imported in SwapInterface, so we don't export it here
 // to avoid static/dynamic import conflicts
 export * from './SwapSettings';
