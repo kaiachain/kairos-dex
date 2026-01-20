@@ -39,11 +39,15 @@ export function useWalletConnection(): UseWalletConnectionReturn {
   const [lastConnectorId, setLastConnectorId] = useState<string | null>(null);
   const reconnectAttemptedRef = useRef(false);
   
-  // Use chainId from account if available (more reliable), otherwise fall back to hook chainId
-  const chainId = accountChainId || hookChainId || 0;
+  // Only use chainId from account when wallet is actually connected with an address
+  // Don't use hookChainId as fallback - it might return a default chain (1) even when not connected
+  // Only trust the chainId when we have a confirmed connection with an address
+  // This prevents false positives when wagmi reports isConnected=true but wallet isn't actually connected
+  const hasValidConnection = isConnected && !!address;
+  const chainId = (hasValidConnection && accountChainId) ? accountChainId : 0;
   
-  // Chain is correct only if connected and chainId matches
-  const isCorrectChain = isConnected && chainId > 0 && chainId === CHAIN_ID;
+  // Chain is correct only if connected with address, have a valid chainId, and chainId matches
+  const isCorrectChain = hasValidConnection && chainId > 0 && chainId === CHAIN_ID;
 
   // Clear error when connection succeeds
   useEffect(() => {

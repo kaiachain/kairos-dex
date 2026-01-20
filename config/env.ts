@@ -23,10 +23,15 @@ function getEnvVar(key: string, required: boolean = true): string {
 }
 
 // Network Configuration
-export const CHAIN_ID = parseInt(
-  getEnvVar("CHAIN_ID"),
-  10
-);
+const chainIdStr = getEnvVar("CHAIN_ID");
+const chainIdParsed = parseInt(chainIdStr, 10);
+if (isNaN(chainIdParsed) || chainIdParsed <= 0) {
+  throw new Error(
+    `Invalid CHAIN_ID: "${chainIdStr}". Must be a positive integer. ` +
+    `Please set VITE_CHAIN_ID in your .env.local file.`
+  );
+}
+export const CHAIN_ID = chainIdParsed;
 export const CHAIN_NAME = getEnvVar("CHAIN_NAME");
 export const CHAIN_NETWORK = getEnvVar("CHAIN_NETWORK");
 export const NATIVE_CURRENCY_NAME = getEnvVar("NATIVE_CURRENCY_NAME");
