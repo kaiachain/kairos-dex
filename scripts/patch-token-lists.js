@@ -84,16 +84,24 @@ if (typeof providers_1.WBTC_OPTIMISM_SEPOLIA === 'undefined') {
         }
         
         // Replace the OPTIMISM_SEPOLIA array with safe version
-        const safePattern = /\[sdk_core_1\.ChainId\.OPTIMISM_SEPOLIA\]:\s*\[([^\]]+)\]/;
+        // Match the exact original pattern: [sdk_core_1.ChainId.OPTIMISM_SEPOLIA]: [ providers_1.DAI_OPTIMISM_SEPOLIA, ... ],
+        // Use a non-greedy pattern that matches the complete array including all tokens
+        const safePattern = /\[sdk_core_1\.ChainId\.OPTIMISM_SEPOLIA\]:\s*\[\s*providers_1\.DAI_OPTIMISM_SEPOLIA[\s\S]*?providers_1\.WBTC_OPTIMISM_SEPOLIA[\s\S]*?\],/;
         const safeReplacement = `[sdk_core_1.ChainId.OPTIMISM_SEPOLIA]: [
         // PATCHED: Safe token list for KAIA chain - filters out undefined tokens
         ...(providers_1.DAI_OPTIMISM_SEPOLIA ? [providers_1.DAI_OPTIMISM_SEPOLIA] : []),
         ...(providers_1.USDC_OPTIMISM_SEPOLIA ? [providers_1.USDC_OPTIMISM_SEPOLIA] : []),
         ...(providers_1.USDT_OPTIMISM_SEPOLIA ? [providers_1.USDT_OPTIMISM_SEPOLIA] : []),
         ...(providers_1.WBTC_OPTIMISM_SEPOLIA ? [providers_1.WBTC_OPTIMISM_SEPOLIA] : []),
-    ]`;
+    ],`;
         
-        let patched = content.replace(safePattern, safeReplacement);
+        // Only replace if not already patched and pattern matches original format
+        let patched = content;
+        if (!content.includes('// PATCHED: Safe token list for KAIA chain') && 
+            content.includes('providers_1.DAI_OPTIMISM_SEPOLIA,') &&
+            !content.includes('...(providers_1.DAI_OPTIMISM_SEPOLIA')) {
+          patched = content.replace(safePattern, safeReplacement);
+        }
         
         if (!patched.includes('// PATCHED for KAIA chain')) {
           patched = '// PATCHED for KAIA chain - handles undefined tokens\n' + patched;

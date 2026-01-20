@@ -80,27 +80,34 @@ try {
       }
 
       // Transform get-candidate-pools to handle undefined tokens in arrays
-      if (id.includes('get-candidate-pools') && !id.includes('.backup')) {
+      // Skip if already patched by the patch script
+      if (id.includes('get-candidate-pools') && !id.includes('.backup') && !code.includes('// PATCHED: Safe token list for KAIA chain')) {
         let transformed = code;
         
         // Handle the OPTIMISM_SEPOLIA array case
-        // Replace: [providers_1.DAI_OPTIMISM_SEPOLIA, providers_1.USDC_OPTIMISM_SEPOLIA, ...]
-        // With: [...(providers_1.DAI_OPTIMISM_SEPOLIA ? [providers_1.DAI_OPTIMISM_SEPOLIA] : []), ...]
-        const optimismSepoliaPattern = /\[sdk_core_1\.ChainId\.OPTIMISM_SEPOLIA\]:\s*\[([^\]]+)\]/;
+        // Only match the original pattern, not already-patched code
+        // Match: [sdk_core_1.ChainId.OPTIMISM_SEPOLIA]: [ providers_1.DAI_OPTIMISM_SEPOLIA, ... ]
+        const optimismSepoliaPattern = /\[sdk_core_1\.ChainId\.OPTIMISM_SEPOLIA\]:\s*\[\s*providers_1\.DAI_OPTIMISM_SEPOLIA[\s\S]*?providers_1\.WBTC_OPTIMISM_SEPOLIA[\s\S]*?\],/;
         
-        transformed = transformed.replace(optimismSepoliaPattern, (match, tokens) => {
-          const tokenList = tokens.split(',').map((t: string) => t.trim()).filter(Boolean);
-          const safeList = tokenList
-            .map((t: string) => {
-              // If it's a providers_1 token reference, wrap it safely
-              if (t.includes('providers_1.')) {
-                return `...(${t} ? [${t}] : [])`;
-              }
-              return t;
-            })
-            .join(', ');
-          return `[sdk_core_1.ChainId.OPTIMISM_SEPOLIA]: [${safeList}]`;
-        });
+        // Only transform if pattern matches original format (not already patched)
+        if (optimismSepoliaPattern.test(code) && !code.includes('...(providers_1.DAI_OPTIMISM_SEPOLIA')) {
+          transformed = code.replace(optimismSepoliaPattern, (match) => {
+            // Extract tokens from the match
+            const tokensMatch = match.match(/providers_1\.(\w+_OPTIMISM_SEPOLIA)/g);
+            if (tokensMatch) {
+              const safeList = tokensMatch
+                .map((token) => {
+                  return `...(providers_1.${token.replace('providers_1.', '')} ? [providers_1.${token.replace('providers_1.', '')}] : [])`;
+                })
+                .join(',\n        ');
+              return `[sdk_core_1.ChainId.OPTIMISM_SEPOLIA]: [
+        // PATCHED: Safe token list for KAIA chain - filters out undefined tokens
+        ${safeList},
+    ],`;
+            }
+            return match;
+          });
+        }
 
         if (transformed !== code) {
           return {
