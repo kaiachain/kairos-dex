@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import path from 'path';
 import { tokenListsStubPlugin } from './lib/vite-token-lists-plugin';
+import viteCompression from 'vite-plugin-compression';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -23,6 +25,24 @@ export default defineConfig({
       exclude: ['fs', 'net', 'tls'],
     }),
     tokenListsStubPlugin(),
+    // Compression plugin for gzip and brotli
+    viteCompression({
+      algorithm: 'gzip',
+      ext: '.gz',
+      threshold: 1024, // Only compress files > 1KB
+    }),
+    viteCompression({
+      algorithm: 'brotliCompress',
+      ext: '.br',
+      threshold: 1024,
+    }),
+    // Bundle analyzer - generates stats.html in dist folder
+    visualizer({
+      open: false, // Set to true to auto-open after build
+      gzipSize: true,
+      brotliSize: true,
+      filename: 'dist/stats.html',
+    }),
   ],
   resolve: {
     alias: [
@@ -90,21 +110,19 @@ export default defineConfig({
     },
     // Force re-optimization to rebuild deps with new settings
     // Set to false after first successful build
-    force: true,
+    force: false,
   },
   build: {
-    // Completely disable minification to avoid TDZ errors
-    // Minification can cause "Cannot access 'X' before initialization" errors
-    // We can re-enable later once TDZ issues are fully resolved
-    minify: false,
-    // Minification options (disabled - minify is false)
-    // esbuild: {
-    //   keepNames: true,
-    //   legalComments: 'none',
-    //   minifyIdentifiers: false,
-    //   minifySyntax: false,
-    //   minifyWhitespace: false,
-    // },
+    // Re-enable minification with keepNames to avoid TDZ errors
+    // keepNames: true prevents "Cannot access 'X' before initialization" errors
+    minify: 'esbuild',
+    esbuild: {
+      keepNames: true, // Critical: Prevents TDZ issues while still minifying
+      legalComments: 'none',
+      minifyIdentifiers: true,
+      minifySyntax: true,
+      minifyWhitespace: true,
+    },
     // Aggressive minification options
     target: 'es2020', // Target modern browsers (ES2020 needed for BigInt literals)
     // Disable sourcemaps for production to reduce bundle size
