@@ -537,6 +537,8 @@ export async function diagnoseRouteFailure(
       hasDirectPool: false,
       poolsWithTokenIn: 0,
       poolsWithTokenOut: 0,
+      poolsWithTokenInNoLiquidity: 0,
+      poolsWithTokenOutNoLiquidity: 0,
       intermediateTokens: [],
       possiblePaths: [],
       reason: 'Unable to diagnose route failure. Please check your connection and try again.',
