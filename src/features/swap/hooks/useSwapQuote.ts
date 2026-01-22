@@ -17,6 +17,7 @@ import { getQuoteFromRouter } from "@/features/swap/services/routerService";
 import { getCacheKey, getCachedQuote, setCachedQuote } from "@/features/swap/utils/quoteCache";
 import { transformQuoteResult } from "@/features/swap/utils/quoteTransformers";
 import { addStatusMessage } from "@/app/providers/contexts/SwapStatusContext";
+import { diagnoseRouteFailure, RouteDiagnostic } from "@/features/swap/services/routeDiagnostics";
 
 // Debounce utility
 function useDebounce<T>(value: T, delay: number): T {
@@ -49,6 +50,7 @@ export function useSwapQuote(
   const [staleQuote, setStaleQuote] = useState<SwapQuote | null>(null);
   const [quoteTimestamp, setQuoteTimestamp] = useState<number | null>(null);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const [routeDiagnostic, setRouteDiagnostic] = useState<RouteDiagnostic | null>(null);
   const expirationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const publicClient = usePublicClient();
 
@@ -129,6 +131,7 @@ export function useSwapQuote(
     const fetchQuote = async () => {
       setIsLoading(true);
       setError(null);
+      setRouteDiagnostic(null); // Clear previous diagnostic
       addStatusMessage('info', `Starting quote fetch: ${tokenIn.symbol} → ${tokenOut.symbol}`, `Amount: ${debouncedAmountIn}`);
 
       try {
@@ -234,6 +237,19 @@ export function useSwapQuote(
           quoteResult = await getQuoteFromRouter(tokenIn, tokenOut, debouncedAmountIn, provider);
           if (quoteResult) {
             addStatusMessage('success', `Route found! Quote: ${quoteResult.amountOut} ${tokenOut.symbol}`, `Gas estimate: ${quoteResult.gasEstimate}`);
+            // Clear diagnostic if route found
+            setRouteDiagnostic(null);
+          } else {
+            // Route not found - run diagnostics
+            addStatusMessage('loading', 'Analyzing route failure...', 'Checking available pools');
+            try {
+              const diagnostic = await diagnoseRouteFailure(tokenIn, tokenOut);
+              setRouteDiagnostic(diagnostic);
+              console.log('Route diagnostic completed:', diagnostic);
+            } catch (diagError) {
+              console.error('Failed to run diagnostics:', diagError);
+              setRouteDiagnostic(null);
+            }
           }
         }
 
@@ -349,6 +365,7 @@ export function useSwapQuote(
     isLoading, 
     error,
     quoteTimestamp, // Expose timestamp for timer
+    routeDiagnostic, // Expose diagnostic info for UI
     // Expose function to get cached route for execution
     getCachedRoute: () => {
       if (!tokenIn || !tokenOut || !debouncedAmountIn) return null;
