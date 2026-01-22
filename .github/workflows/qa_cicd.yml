@@ -7,7 +7,7 @@ on:
 env:
   PROJECT_ID: "kaia-cluster-dev"
   SERVICE_ACCOUNT: "kairos-dex-qa@kaia-cluster-dev.iam.gserviceaccount.com"
-  WORKLOAD_IDENTITY_PROVIDER: "projects/383360562319/locations/global/workloadIdentityPools/kaia-cluster-dev/providers/kairos-dex-gha-prvdr"
+  WORKLOAD_IDENTITY_PROVIDER: "projects/383360562319/locations/global/workloadIdentityPools/kaia-cluster-dev/providers/kairos-dex"
 
 jobs:
   deploy:
