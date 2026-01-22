@@ -233,17 +233,18 @@ export function CreatePool() {
     : false;
   const isLoadingOrPending =
     isLoading || isPending || isInitLoading || isInitPending;
+  const isFullySuccess = isSuccess && isInitSuccess;
   const isButtonDisabled =
     !token0 ||
     !token1 ||
     !initialPrice ||
     !isValidPrice ||
     !isConnected ||
-    isLoadingOrPending;
+    isLoadingOrPending ||
+    isFullySuccess;
 
   // Display errors if any
   const displayError = writeError || txError || initWriteError || initTxError;
-  const isFullySuccess = isSuccess && isInitSuccess;
 
   return (
     <div className="p-6 bg-white rounded-3xl border shadow-lg dark:bg-card border-border">
