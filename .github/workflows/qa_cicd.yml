@@ -2,7 +2,7 @@ name: kairos-dex qa deploy workflow
 on:
   push:
     branches:
-      - update-cicd
+      - qa
 
 env:
   PROJECT_ID: "kaia-cluster-dev"
