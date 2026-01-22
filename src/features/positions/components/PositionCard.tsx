@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Position } from "@/features/positions/types/position";
 import { formatCurrency, formatNumber, formatBalance } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Plus, Minus, Coins } from "lucide-react";
+import { isPositionInRange } from "../utils/positionUtils";
 
 interface PositionCardProps {
   position: Position;
@@ -23,28 +24,8 @@ function PositionCardComponent({
   const isFullRange =
     position.priceMin === 0 && position.priceMax >= FULL_RANGE_THRESHOLD;
 
-  // For full range positions, always consider them in range
-  // For regular positions, use tick-based comparison if available (more accurate),
-  // otherwise fall back to price-based comparison
-  let isInRange: boolean;
-  if (isFullRange) {
-    isInRange = true;
-  } else if (
-    position.tickLower !== undefined &&
-    position.tickUpper !== undefined &&
-    position.currentTick !== undefined
-  ) {
-    // Use tick-based comparison (more accurate, especially for extreme prices)
-    // In Uniswap V3, a position is in range if: tickLower <= currentTick <= tickUpper
-    isInRange =
-      position.currentTick >= position.tickLower &&
-      position.currentTick <= position.tickUpper;
-  } else {
-    // Fall back to price-based comparison
-    isInRange =
-      position.currentPrice >= position.priceMin &&
-      position.currentPrice <= position.priceMax;
-  }
+  // Use utility function to determine if position is in range
+  const isInRange = isPositionInRange(position);
 
   return (
     <Link to={`/positions/${position.tokenId}`}>

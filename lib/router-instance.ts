@@ -367,8 +367,8 @@ async function createOnChainQuoteProvider(provider: JsonRpcProvider, multicall2P
     const customBatchParams = () => ({
       ...DEFAULT_BATCH_PARAMS,
       gasLimitPerCall: 5000000,
-      multicallChunk: 30, // Moderate chunks - allow more for multi-hop
-      quoteMinSuccessRate: 0.1, // Slightly higher threshold for reliability
+      multicallChunk: 50, // Increased chunks for multi-hop routes (more pools to check)
+      quoteMinSuccessRate: 0.05, // Lower threshold to allow more paths to be explored
     });
 
     const customBlockNumberConfig = () => ({
@@ -378,9 +378,9 @@ async function createOnChainQuoteProvider(provider: JsonRpcProvider, multicall2P
 
     // Use balanced retry options - allow retries for multi-hop reliability
     const fastRetryOptions = {
-      retries: 1, // Allow 1 retry for multi-hop routes
+      retries: 2, // Allow 2 retries for multi-hop routes (increased for better reliability)
       minTimeout: 50,
-      maxTimeout: 500,
+      maxTimeout: 1000, // Increased max timeout for multi-hop routes
     };
 
     return new OnChainQuoteProvider(
@@ -494,8 +494,8 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
     // Use more pools for multi-hop routes, but still optimized for speed
     const v3SubgraphProvider = new V3SubgraphProvider(
       CHAIN_ID,
-      5, // Increased to 5 - need more pools for multi-hop route discovery
-      15000, // Increased timeout to 15s - multi-hop routes need more time
+      20, // Increased to 20 - need significantly more pools for multi-hop route discovery (WKLAY -> intermediate -> YTK)
+      20000, // Increased timeout to 20s - multi-hop routes need more time to explore paths
       true,
       0.01,
       Number.MAX_VALUE,
@@ -507,7 +507,7 @@ export async function getRouterInstance(provider?: JsonRpcProvider): Promise<any
     const v3PoolProvider = new V3PoolProvider(
       ChainId.MAINNET,
       multicall2Provider as any,
-      { retries: 1, minTimeout: 50, maxTimeout: 500 } // Allow 1 retry for multi-hop reliability
+      { retries: 2, minTimeout: 50, maxTimeout: 1000 } // Allow 2 retries for multi-hop reliability
     );
 
     const onChainQuoteProvider = await createOnChainQuoteProvider(rpcProvider, multicall2Provider);

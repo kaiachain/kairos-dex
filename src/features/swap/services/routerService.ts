@@ -11,6 +11,7 @@ import { getRouterInstance } from "@/lib/router-instance";
 import { fromReadableAmount, TokenAmount } from "@/lib/router-setup";
 import { formatUnits } from "@/lib/utils";
 import { addStatusMessage } from "@/app/providers/contexts/SwapStatusContext";
+import { diagnoseRouteFailure, RouteDiagnostic } from "./routeDiagnostics";
 
 export interface RouterQuoteResult {
   amountOut: string;
@@ -238,12 +239,20 @@ export async function getQuoteFromRouter(
     };
 
     console.log(`Finding route: ${tokenIn.symbol} -> ${tokenOut.symbol} (may be multi-hop)`);
+    console.log(`Token addresses: ${tokenIn.address} -> ${tokenOut.address}`);
     addStatusMessage('loading', 'Smart Order Router: Finding route...', 'Exploring pools and paths');
     const startTime = Date.now();
     
+    // Add diagnostic logging before route call
+    console.log('Router options:', {
+      slippageTolerance: defaultOptions.slippageTolerance.toFixed(2) + '%',
+      deadline: new Date(defaultOptions.deadline * 1000).toISOString(),
+      swapType: defaultOptions.type,
+    });
+    
     const routePromise = router.route(amountInCurrency, sdkTokenOut, TradeType.EXACT_INPUT, defaultOptions);
     const timeoutPromise = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('Quote request timeout after 20 seconds')), 20000)
+      setTimeout(() => reject(new Error('Quote request timeout after 30 seconds')), 30000)
     );
     
     let route: any;
@@ -253,7 +262,31 @@ export async function getQuoteFromRouter(
       
       if (!route || route === null) {
         console.error(`❌ Router returned null (no route found) after ${duration}ms`);
-        addStatusMessage('error', `No route found after ${(duration / 1000).toFixed(2)}s`, 'No valid path exists between these tokens. Check if pools exist.');
+        console.error(`This usually means:`);
+        console.error(`1. No direct pool exists between ${tokenIn.symbol} and ${tokenOut.symbol}`);
+        console.error(`2. No multi-hop path exists (e.g., ${tokenIn.symbol} -> intermediate token -> ${tokenOut.symbol})`);
+        console.error(`3. All potential paths have insufficient liquidity`);
+        console.error(`Token addresses: ${tokenIn.address} -> ${tokenOut.address}`);
+        
+        // Run diagnostics to provide better error message
+        addStatusMessage('loading', 'Analyzing why route failed...', 'Checking available pools');
+        try {
+          const diagnostic = await diagnoseRouteFailure(tokenIn, tokenOut);
+          console.log('Route diagnostic:', diagnostic);
+          
+          // Store diagnostic in a way that can be accessed by UI
+          // We'll attach it to the error message details
+          const diagnosticMessage = `Diagnostic: ${diagnostic.reason}`;
+          addStatusMessage('error', `No route found after ${(duration / 1000).toFixed(2)}s`, diagnosticMessage);
+          
+          // Return null but with diagnostic info in a special way
+          // We'll use a custom error object that includes diagnostic
+          (globalThis as any).__lastRouteDiagnostic = diagnostic;
+        } catch (diagError) {
+          console.error('Failed to run diagnostics:', diagError);
+          addStatusMessage('error', `No route found after ${(duration / 1000).toFixed(2)}s`, 'No valid path exists between these tokens. Check if pools exist.');
+        }
+        
         return null;
       }
       

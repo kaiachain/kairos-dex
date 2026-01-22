@@ -3,6 +3,8 @@ import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Token } from '@/shared/types/token';
 import { SwapQuote } from '@/features/swap/types/swap';
 import { useSwapExecution, SwapStatus } from '@/features/swap/hooks/useSwapExecution';
+import { NoRouteFound } from './NoRouteFound';
+import { RouteDiagnostic } from '@/features/swap/services/routeDiagnostics';
 
 interface SwapButtonProps {
   tokenIn: Token | null;
@@ -14,6 +16,7 @@ interface SwapButtonProps {
   quote: SwapQuote | null;
   isQuoteLoading: boolean;
   cachedRoute?: any; // Optional cached route for faster execution
+  routeDiagnostic?: RouteDiagnostic | null; // Diagnostic info when route not found
   onSwapSuccess?: (hash: string) => void;
 }
 
@@ -27,6 +30,7 @@ export function SwapButton({
   quote,
   isQuoteLoading,
   cachedRoute,
+  routeDiagnostic,
   onSwapSuccess,
 }: SwapButtonProps) {
   const {
@@ -116,15 +120,18 @@ export function SwapButton({
     );
   }
 
-  // No quote available
-  if (!quote) {
+  // No quote available - show diagnostic if available
+  if (!quote && !isQuoteLoading && tokenIn && tokenOut) {
     return (
-      <button
-        disabled
-        className="w-full py-4 bg-secondary text-text-secondary rounded-2xl font-semibold cursor-not-allowed"
-      >
-        No Route Found
-      </button>
+      <NoRouteFound
+        tokenIn={tokenIn}
+        tokenOut={tokenOut}
+        diagnostic={routeDiagnostic || null}
+        onRetry={() => {
+          // Trigger refetch by updating amount (this will cause useSwapQuote to refetch)
+          // The parent component should handle this, but we can at least show the button
+        }}
+      />
     );
   }
 

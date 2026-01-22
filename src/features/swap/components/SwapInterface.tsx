@@ -49,7 +49,7 @@ export function SwapInterface() {
 
   const { data: balanceIn, refetch: refetchBalanceIn } = useTokenBalance(tokenIn);
   const { data: balanceOut, refetch: refetchBalanceOut } = useTokenBalance(tokenOut);
-  const { data: quote, isLoading: isQuoteLoading, error: quoteError, getCachedRoute, quoteTimestamp } = useSwapQuote(
+  const { data: quote, isLoading: isQuoteLoading, error: quoteError, getCachedRoute, quoteTimestamp, routeDiagnostic } = useSwapQuote(
     tokenIn,
     tokenOut,
     amountIn
@@ -528,6 +528,7 @@ export function SwapInterface() {
           quote={quote}
           isQuoteLoading={isQuoteLoading}
           cachedRoute={getCachedRoute?.()}
+          routeDiagnostic={routeDiagnostic}
           onSwapSuccess={onSwapSuccess}
         />
 

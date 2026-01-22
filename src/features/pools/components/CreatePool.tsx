@@ -306,13 +306,15 @@ export function CreatePool() {
     : false;
   const isLoadingOrPending =
     isLoading || isPending || isInitLoading || isInitPending;
+  const isFullySuccess = isSuccess && isInitSuccess;
   const isButtonDisabled =
     !token0 ||
     !token1 ||
     !initialPrice ||
     !isValidPrice ||
     !isConnected ||
-    isLoadingOrPending;
+    isLoadingOrPending ||
+    isFullySuccess;
 
   // Get formatted error messages
   const createPoolErrorMessage = useMemo(() => {
@@ -337,7 +339,6 @@ export function CreatePool() {
 
   // Display errors if any
   const displayError = writeError || txError || initWriteError || initTxError;
-  const isFullySuccess = isSuccess && isInitSuccess;
 
   return (
     <div className="bg-white dark:bg-card rounded-3xl shadow-lg p-6 border border-border">
