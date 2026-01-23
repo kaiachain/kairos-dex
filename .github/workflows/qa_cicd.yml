@@ -2,7 +2,7 @@ name: kairos-dex qa deploy workflow
 on:
   push:
     branches:
-      - test
+      - qa
 
 env:
   PROJECT_ID: "kaia-cluster-dev"
@@ -59,3 +59,4 @@ jobs:
             load_balancer_name: kairos-dex-qa
             path: '/*'
             host: 'kairos-dex.qa.kaia.io'
+            
